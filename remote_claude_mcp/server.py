@@ -103,6 +103,9 @@ async def remote_bash(
     command: str, timeout: int = 120, description: str = ""
 ) -> str:
     conn = _get_active()
+    # Always reset to work_dir before running — the remote shell persists cd
+    if conn.work_dir:
+        command = f"cd {conn.work_dir} && {command}"
     args = {"command": command, "timeout": timeout}
     if description:
         args["description"] = description
