@@ -105,7 +105,7 @@ class RemoteConnection:
     async def call_tool_with_progress(
         self, tool_name: str, arguments: dict, ctx, progress_interval: int = 5
     ) -> str:
-        """Call a tool, reporting progress to ctx while waiting for the response."""
+        """Call a tool, reporting progress with heartbeat while waiting."""
         req_id = self.next_id()
         request = {"jsonrpc": "2.0", "id": req_id, "method": "tools/call",
                     "params": {"name": tool_name, "arguments": arguments}}
@@ -127,16 +127,34 @@ class RemoteConnection:
                     return self._extract_result(result)
                 except asyncio.TimeoutError:
                     elapsed += progress_interval
+                    # Heartbeat: send a quick command to verify connection is alive
+                    try:
+                        hb = await asyncio.wait_for(
+                            self._heartbeat(), timeout=10
+                        )
+                        if not hb:
+                            return "[ERROR] Remote connection lost (heartbeat failed)"
+                    except asyncio.TimeoutError:
+                        return "[ERROR] Remote connection lost (heartbeat timeout)"
                     if ctx:
                         await ctx.report_progress(
                             elapsed, elapsed + 60,
-                            f"Running on remote ({elapsed}s)..."
+                            f"Running on remote ({elapsed}s, connection alive)..."
                         )
-                    # Safety: give up after 10 minutes
                     if elapsed > 600:
                         return "[ERROR] Remote command timed out after 600s"
         finally:
             self._pending.pop(req_id, None)
+
+    async def _heartbeat(self) -> bool:
+        """Send a quick echo to verify the remote connection is alive."""
+        try:
+            resp = await self.send_request(
+                "tools/call", {"name": "Bash", "arguments": {"command": "echo 1"}}
+            )
+            return "error" not in resp
+        except Exception:
+            return False
 
     @staticmethod
     def _extract_result(resp: dict) -> str:
