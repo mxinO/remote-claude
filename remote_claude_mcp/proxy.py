@@ -178,7 +178,6 @@ class RemoteConnection:
         if self._read_task:
             self._read_task.cancel()
         if self.process.returncode is None:
-            # Close stdin — remote `exec claude mcp serve` should exit on EOF
             try:
                 self.process.stdin.close()
             except Exception:
@@ -186,12 +185,20 @@ class RemoteConnection:
             try:
                 await asyncio.wait_for(self.process.wait(), timeout=3)
             except asyncio.TimeoutError:
-                # If still alive, terminate the SSH process
                 self.process.terminate()
                 try:
                     await asyncio.wait_for(self.process.wait(), timeout=3)
                 except asyncio.TimeoutError:
                     self.process.kill()
+        # Also kill remote process via PID file as a safety net
+        pidfile = f"/tmp/remote-claude-mcp-{self.cluster.name}.pid"
+        try:
+            await _run_ssh_command(
+                self.cluster,
+                f"test -f {pidfile} && kill $(cat {pidfile}) 2>/dev/null; rm -f {pidfile}"
+            )
+        except Exception:
+            pass
 
 
 def _build_ssh_args(cluster: ClusterConfig) -> list[str]:
@@ -261,10 +268,18 @@ async def connect(cluster: ClusterConfig, work_dir: str = "") -> RemoteConnectio
 
     logger.info(f"Using claude at {claude_path} on {cluster.name}")
 
-    # Step 2: Start `claude mcp serve` over SSH, optionally in a working directory
-    # Use exec so the shell is replaced by claude — when SSH terminates,
-    # SIGHUP is sent directly to claude, not to a parent shell.
-    serve_cmd = f"cd {work_dir} && exec {claude_path} mcp serve" if work_dir else f"exec {claude_path} mcp serve"
+    # Step 2: Kill any orphan claude mcp serve processes from previous sessions
+    pidfile = f"/tmp/remote-claude-mcp-{cluster.name}.pid"
+    await _run_ssh_command(
+        cluster,
+        f"test -f {pidfile} && kill $(cat {pidfile}) 2>/dev/null; rm -f {pidfile}"
+    )
+
+    # Step 3: Start `claude mcp serve` over SSH, optionally in a working directory
+    # Write PID to file so we can clean up orphans. Use exec so the shell is
+    # replaced by claude — when SSH terminates, SIGHUP is sent directly to claude.
+    cd_cmd = f"cd {work_dir} && " if work_dir else ""
+    serve_cmd = f'{cd_cmd}echo $$ > {pidfile} && exec {claude_path} mcp serve'
     ssh_args = _build_ssh_args(cluster) + ["--", serve_cmd]
     proc = await asyncio.create_subprocess_exec(
         *ssh_args,
