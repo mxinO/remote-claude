@@ -101,30 +101,41 @@ else
     echo "Config already exists at $CONFIG_DIR/clusters.yaml"
 fi
 
-# Append CLAUDE.md instructions if not already present
+# Update CLAUDE.md instructions (replace if exists, append if not)
 CLAUDE_MD="$HOME/.claude/CLAUDE.md"
-MARKER="## Remote clusters (ssh-gateway-mcp)"
-if [ -f "$CLAUDE_MD" ] && grep -qF "$MARKER" "$CLAUDE_MD"; then
-    echo "CLAUDE.md already has ssh-gateway instructions."
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+MARKER_START="## Remote clusters (ssh-gateway-mcp)"
+MARKER_END="# End ssh-gateway-mcp"
+INSTRUCTIONS="$(cat "$SCRIPT_DIR/claude_md_instructions.md")"
+
+mkdir -p "$HOME/.claude"
+if [ -f "$CLAUDE_MD" ] && grep -qF "$MARKER_START" "$CLAUDE_MD"; then
+    # Replace existing block between markers
+    python3 - "$CLAUDE_MD" "$MARKER_START" "$MARKER_END" "$INSTRUCTIONS" << 'PYSCRIPT'
+import sys
+path, marker_start, marker_end, new_content = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+with open(path) as f:
+    content = f.read()
+# Find the block: from marker_start to marker_end (or next ## heading or EOF)
+start = content.find(marker_start)
+if start == -1:
+    sys.exit(0)
+# Look for the end: next ## heading after the marker_start line
+rest = content[start + len(marker_start):]
+end = -1
+for i, line in enumerate(rest.split('\n')[1:], 1):
+    if line.startswith('## ') or line.strip() == marker_end:
+        end = start + len(marker_start) + sum(len(l)+1 for l in rest.split('\n')[:i])
+        break
+if end == -1:
+    end = len(content)
+with open(path, 'w') as f:
+    f.write(content[:start] + new_content.rstrip() + '\n' + content[end:])
+PYSCRIPT
+    echo "Updated ssh-gateway instructions in $CLAUDE_MD"
 else
-    mkdir -p "$HOME/.claude"
-    cat >> "$CLAUDE_MD" << 'INSTRUCTIONS'
-
-## Remote clusters (ssh-gateway-mcp)
-
-When the user asks to work on a remote machine (e.g. "work on dev1", "let's use the prod cluster",
-"edit files on my-host.example.com"), use the ssh-gateway MCP tools:
-- First call use_cluster() with the cluster name or hostname to connect.
-- If the user specifies a working directory, pass it as work_dir to use_cluster().
-  This starts the remote server in that directory so relative paths work naturally.
-- Then use remote_bash, remote_read, remote_edit, remote_write, remote_glob, remote_grep
-  as drop-in replacements for the local Bash, Read, Edit, Write, Glob, Grep tools.
-- All file paths should be absolute paths on the remote machine.
-  If a work_dir was set, relative paths resolve from there.
-- Cluster names are defined in ~/.config/ssh-gateway-mcp/clusters.yaml.
-  The user may also provide a raw hostname instead of a configured name.
-- Stay on the remote cluster for subsequent commands until the user says otherwise.
-INSTRUCTIONS
+    # Append new block
+    printf "\n%s\n" "$INSTRUCTIONS" >> "$CLAUDE_MD"
     echo "Appended ssh-gateway instructions to $CLAUDE_MD"
 fi
 
