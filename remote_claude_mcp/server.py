@@ -113,7 +113,7 @@ async def remote_bash(
     if run_in_background:
         args["run_in_background"] = True
         result = await conn.call_tool("Bash", args)
-        return _format_background_result(result, conn)
+        return await _format_background_result(result, conn)
     return await conn.call_tool_with_progress("Bash", args, ctx)
 
 
@@ -197,24 +197,35 @@ async def remote_agent(
     if run_in_background:
         args["run_in_background"] = True
         result = await conn.call_tool("Agent", args)
-        return _format_background_result(result, conn)
+        return await _format_background_result(result, conn)
     return await conn.call_tool_with_progress("Agent", args, ctx, progress_interval=10)
 
 
 _TASK_OUTPUT_PATTERN = "/tmp/claude-$(id -u)/*/tasks/{task_id}.output"
 
 
-def _format_background_result(result: str, conn: RemoteConnection) -> str:
-    """Format a background task result with task ID and output file info."""
+async def _format_background_result(result: str, conn: RemoteConnection) -> str:
+    """Format a background task result with task ID and resolved output file path."""
     try:
         parsed = json.loads(result)
         task_id = parsed.get("backgroundTaskId", "")
         if task_id:
-            return (
-                f"Background task started on remote: {task_id}\n"
-                f"Check output with:\n"
-                f"  remote_bash(command=\"find /tmp/claude-$(id -u) -name '{task_id}.output' -exec cat {{}} \\;\")"
-            )
+            # Resolve the actual output file path
+            find_result = await conn.call_tool("Bash", {
+                "command": f"find /tmp/claude-$(id -u) -name '{task_id}.output' 2>/dev/null | head -1"
+            })
+            output_file = ""
+            try:
+                output_file = json.loads(find_result).get("stdout", "").strip()
+            except (json.JSONDecodeError, TypeError):
+                pass
+            if output_file:
+                return (
+                    f"Background task started on remote: {task_id}\n"
+                    f"Output file: {output_file}\n"
+                    f"Check with: remote_read(file_path=\"{output_file}\")"
+                )
+            return f"Background task started on remote: {task_id}"
     except (json.JSONDecodeError, TypeError):
         pass
     return result
