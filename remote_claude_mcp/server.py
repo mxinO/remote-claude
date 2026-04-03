@@ -177,6 +177,17 @@ async def remote_grep(
     return await conn.call_tool("Grep", args)
 
 
+@server.tool(description="Same as Agent but runs on the active remote cluster. Spawns a sub-agent remotely.")
+async def remote_agent(
+    prompt: str, description: str = "", subagent_type: str = "", ctx: Context = None
+) -> str:
+    conn = _get_active()
+    args = {"prompt": prompt, "description": description or "remote sub-agent"}
+    if subagent_type:
+        args["subagent_type"] = subagent_type
+    return await conn.call_tool_with_progress("Agent", args, ctx, progress_interval=10)
+
+
 def _cleanup():
     """Kill all remote SSH processes on exit."""
     for name, conn in _connections.items():
