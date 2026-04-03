@@ -6,14 +6,11 @@ import asyncio
 import json
 import logging
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any, Dict, Optional
 
 from .config import ClusterConfig
 
 logger = logging.getLogger(__name__)
-
-CONTROL_DIR = Path.home() / ".ssh" / "controlmasters"
 
 # Paths to search for claude on remote host
 CLAUDE_SEARCH_PATHS = [
@@ -132,9 +129,6 @@ def _build_ssh_args(cluster: ClusterConfig) -> list[str]:
     """Build SSH command args from cluster config."""
     args = [
         "ssh",
-        "-o", "ControlMaster=auto",
-        "-o", f"ControlPath={CONTROL_DIR}/%r@%h:%p",
-        "-o", "ControlPersist=600",
         "-o", "BatchMode=yes",
         "-o", "StrictHostKeyChecking=accept-new",
     ]
@@ -152,7 +146,7 @@ def _build_ssh_args(cluster: ClusterConfig) -> list[str]:
 
 async def _run_ssh_command(cluster: ClusterConfig, command: str) -> tuple[int, str, str]:
     """Run a one-shot SSH command. Returns (returncode, stdout, stderr)."""
-    CONTROL_DIR.mkdir(parents=True, exist_ok=True)
+
     args = _build_ssh_args(cluster) + ["--", command]
     proc = await asyncio.create_subprocess_exec(
         *args,
@@ -188,7 +182,7 @@ async def find_claude_path(cluster: ClusterConfig) -> Optional[str]:
 
 async def connect(cluster: ClusterConfig) -> RemoteConnection:
     """Connect to a cluster: find claude, start MCP serve, do handshake."""
-    CONTROL_DIR.mkdir(parents=True, exist_ok=True)
+
 
     # Step 1: Find claude (must be pre-installed and authenticated)
     claude_path = await find_claude_path(cluster)
