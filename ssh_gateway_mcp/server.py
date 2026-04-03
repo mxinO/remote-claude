@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import atexit
+import asyncio
 import logging
 from typing import Dict, Optional
 
@@ -175,9 +177,22 @@ async def remote_grep(
     return await conn.call_tool("Grep", args)
 
 
+def _cleanup():
+    """Kill all remote SSH processes on exit."""
+    for name, conn in _connections.items():
+        if conn.process.returncode is None:
+            logger.info(f"Closing connection to {name}")
+            conn.process.terminate()
+            try:
+                conn.process.wait()
+            except Exception:
+                conn.process.kill()
+
+
 def run(config_path: str = None):
     global _config
     logging.basicConfig(level=logging.INFO, format="%(name)s: %(message)s")
     _config = load_config(config_path)
     logger.info(f"Loaded {len(_config.clusters)} cluster(s) from config")
+    atexit.register(_cleanup)
     server.run(transport="stdio")

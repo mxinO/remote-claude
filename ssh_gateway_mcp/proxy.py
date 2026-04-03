@@ -118,11 +118,20 @@ class RemoteConnection:
         if self._read_task:
             self._read_task.cancel()
         if self.process.returncode is None:
-            self.process.terminate()
+            # Close stdin — remote `exec claude mcp serve` should exit on EOF
             try:
-                await asyncio.wait_for(self.process.wait(), timeout=5)
+                self.process.stdin.close()
+            except Exception:
+                pass
+            try:
+                await asyncio.wait_for(self.process.wait(), timeout=3)
             except asyncio.TimeoutError:
-                self.process.kill()
+                # If still alive, terminate the SSH process
+                self.process.terminate()
+                try:
+                    await asyncio.wait_for(self.process.wait(), timeout=3)
+                except asyncio.TimeoutError:
+                    self.process.kill()
 
 
 def _build_ssh_args(cluster: ClusterConfig) -> list[str]:
@@ -193,8 +202,10 @@ async def connect(cluster: ClusterConfig, work_dir: str = "") -> RemoteConnectio
     logger.info(f"Using claude at {claude_path} on {cluster.name}")
 
     # Step 2: Start `claude mcp serve` over SSH, optionally in a working directory
-    remote_cmd = f"cd {work_dir} && {claude_path} mcp serve" if work_dir else f"{claude_path} mcp serve"
-    ssh_args = _build_ssh_args(cluster) + ["--", remote_cmd]
+    # Use exec so the shell is replaced by claude — when SSH terminates,
+    # SIGHUP is sent directly to claude, not to a parent shell.
+    serve_cmd = f"cd {work_dir} && exec {claude_path} mcp serve" if work_dir else f"exec {claude_path} mcp serve"
+    ssh_args = _build_ssh_args(cluster) + ["--", serve_cmd]
     proc = await asyncio.create_subprocess_exec(
         *ssh_args,
         stdin=asyncio.subprocess.PIPE,
