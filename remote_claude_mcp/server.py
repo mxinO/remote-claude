@@ -60,12 +60,6 @@ async def use_cluster(name: str, work_dir: str = "") -> str:
         else:
             return f"Switched to cluster '{name}' ({_connections[name].cluster.host})"
 
-    # Close previous active cluster when connecting to a different one
-    if _active_cluster and _active_cluster != name and _active_cluster in _connections:
-        logger.info(f"Closing previous cluster '{_active_cluster}'")
-        await _connections[_active_cluster].close()
-        del _connections[_active_cluster]
-
     # Resolve config
     if name in _config.clusters:
         cluster = _config.clusters[name]
