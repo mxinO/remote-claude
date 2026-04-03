@@ -201,15 +201,7 @@ async def remote_agent(
     return await conn.call_tool_with_progress("Agent", args, ctx, progress_interval=10)
 
 
-async def _find_task_output_file(conn: RemoteConnection, task_id: str) -> str:
-    """Find the output file for a background task on the remote host."""
-    result = await conn.call_tool("Bash", {
-        "command": f"find /tmp -name '{task_id}.output' 2>/dev/null | head -1"
-    })
-    try:
-        return json.loads(result).get("stdout", "").strip()
-    except (json.JSONDecodeError, TypeError):
-        return ""
+_TASK_OUTPUT_PATTERN = "/tmp/claude-$(id -u)/*/tasks/{task_id}.output"
 
 
 def _format_background_result(result: str, conn: RemoteConnection) -> str:
@@ -218,11 +210,11 @@ def _format_background_result(result: str, conn: RemoteConnection) -> str:
         parsed = json.loads(result)
         task_id = parsed.get("backgroundTaskId", "")
         if task_id:
+            output_glob = _TASK_OUTPUT_PATTERN.format(task_id=task_id)
             return (
                 f"Background task started on remote: {task_id}\n"
-                f"Output file: /tmp/claude-*/*/tasks/{task_id}.output (on remote)\n"
-                f"Use remote_read or remote_bash to check status manually:\n"
-                f"  remote_bash(command=\"cat $(find /tmp -name '{task_id}.output' 2>/dev/null)\")"
+                f"Check output with:\n"
+                f"  remote_bash(command=\"cat {output_glob}\")"
             )
     except (json.JSONDecodeError, TypeError):
         pass
