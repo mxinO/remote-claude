@@ -1,0 +1,16 @@
+clusters:
+  # Give each cluster a short, memorable name.
+  # Use that name with: use_cluster("dev1")
+
+  dev1:
+    host: dev-cluster-01.example.com
+    user: myuser
+    # claude_path: ~/.local/bin/claude  # auto-detected if omitted
+    # jump_proxy: bastion.example.com   # ProxyJump host
+    # ssh_key: ~/.ssh/id_rsa            # identity file
+    # port: 22
+
+  # prod1:
+  #   host: prod-cluster-01.example.com
+  #   user: myuser
+  #   jump_proxy: bastion.example.com
