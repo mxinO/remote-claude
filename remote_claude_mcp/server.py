@@ -210,11 +210,10 @@ def _format_background_result(result: str, conn: RemoteConnection) -> str:
         parsed = json.loads(result)
         task_id = parsed.get("backgroundTaskId", "")
         if task_id:
-            output_glob = _TASK_OUTPUT_PATTERN.format(task_id=task_id)
             return (
                 f"Background task started on remote: {task_id}\n"
                 f"Check output with:\n"
-                f"  remote_bash(command=\"cat {output_glob}\")"
+                f"  remote_bash(command=\"find /tmp/claude-$(id -u) -name '{task_id}.output' -exec cat {{}} \\;\")"
             )
     except (json.JSONDecodeError, TypeError):
         pass
