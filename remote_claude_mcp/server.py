@@ -185,20 +185,6 @@ async def remote_grep(
     return await conn.call_tool("Grep", args)
 
 
-@server.tool(description="Same as Agent but runs on the active remote cluster. Spawns a sub-agent remotely.")
-async def remote_agent(
-    prompt: str, description: str = "", subagent_type: str = "",
-    run_in_background: bool = False, ctx: Context = None,
-) -> str:
-    conn = _get_active()
-    args = {"prompt": prompt, "description": description or "remote sub-agent"}
-    if subagent_type:
-        args["subagent_type"] = subagent_type
-    if run_in_background:
-        args["run_in_background"] = True
-        result = await conn.call_tool("Agent", args)
-        return await _format_background_result(result, conn)
-    return await conn.call_tool_with_progress("Agent", args, ctx, progress_interval=10)
 
 
 _TASK_OUTPUT_PATTERN = "/tmp/claude-$(id -u)/*/tasks/{task_id}.output"
