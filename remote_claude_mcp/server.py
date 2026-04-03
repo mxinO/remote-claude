@@ -219,15 +219,29 @@ async def _format_background_result(result: str, conn: RemoteConnection) -> str:
 
 
 def _cleanup():
-    """Kill all remote SSH processes on exit."""
+    """Kill all remote SSH/claude processes on exit."""
+    import subprocess
     for name, conn in _connections.items():
+        logger.info(f"Closing connection to {name}")
+        # Kill local SSH process
         if conn.process.returncode is None:
-            logger.info(f"Closing connection to {name}")
             conn.process.terminate()
             try:
                 conn.process.wait()
             except Exception:
                 conn.process.kill()
+        # Kill remote claude mcp serve via PID file
+        pidfile = f"/tmp/remote-claude-mcp-{conn.cluster.name}.pid"
+        host = f"{conn.cluster.user}@{conn.cluster.host}" if conn.cluster.user else conn.cluster.host
+        try:
+            subprocess.run(
+                ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5",
+                 host, "--",
+                 f"test -f {pidfile} && kill $(cat {pidfile}) 2>/dev/null; rm -f {pidfile}"],
+                timeout=10, capture_output=True
+            )
+        except Exception:
+            pass
 
 
 def _signal_handler(sig, frame):
