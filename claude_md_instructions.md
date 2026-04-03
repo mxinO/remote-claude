@@ -1,3 +1,4 @@
+<!-- BEGIN ssh-gateway-mcp -->
 ## Remote clusters (ssh-gateway-mcp)
 
 When the user asks to work on a remote machine (e.g. "work on dev1", "let's use the prod cluster",
@@ -12,3 +13,4 @@ When the user asks to work on a remote machine (e.g. "work on dev1", "let's use 
 - Cluster names are defined in ~/.config/ssh-gateway-mcp/clusters.yaml.
   The user may also provide a raw hostname instead of a configured name.
 - Stay on the remote cluster for subsequent commands until the user says otherwise.
+<!-- END ssh-gateway-mcp -->

@@ -104,31 +104,26 @@ fi
 # Update CLAUDE.md instructions (replace if exists, append if not)
 CLAUDE_MD="$HOME/.claude/CLAUDE.md"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-MARKER_START="## Remote clusters (ssh-gateway-mcp)"
-MARKER_END="# End ssh-gateway-mcp"
+MARKER_START="<!-- BEGIN ssh-gateway-mcp -->"
+MARKER_END="<!-- END ssh-gateway-mcp -->"
 INSTRUCTIONS="$(cat "$SCRIPT_DIR/claude_md_instructions.md")"
 
 mkdir -p "$HOME/.claude"
 if [ -f "$CLAUDE_MD" ] && grep -qF "$MARKER_START" "$CLAUDE_MD"; then
-    # Replace existing block between markers
+    # Replace existing block between markers (inclusive)
     python3 - "$CLAUDE_MD" "$MARKER_START" "$MARKER_END" "$INSTRUCTIONS" << 'PYSCRIPT'
 import sys
-path, marker_start, marker_end, new_content = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+path, start_marker, end_marker, new_content = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 with open(path) as f:
     content = f.read()
-# Find the block: from marker_start to marker_end (or next ## heading or EOF)
-start = content.find(marker_start)
-if start == -1:
+start = content.find(start_marker)
+end = content.find(end_marker)
+if start == -1 or end == -1:
     sys.exit(0)
-# Look for the end: next ## heading after the marker_start line
-rest = content[start + len(marker_start):]
-end = -1
-for i, line in enumerate(rest.split('\n')[1:], 1):
-    if line.startswith('## ') or line.strip() == marker_end:
-        end = start + len(marker_start) + sum(len(l)+1 for l in rest.split('\n')[:i])
-        break
-if end == -1:
-    end = len(content)
+end += len(end_marker)
+# Skip trailing newline after end marker
+if end < len(content) and content[end] == '\n':
+    end += 1
 with open(path, 'w') as f:
     f.write(content[:start] + new_content.rstrip() + '\n' + content[end:])
 PYSCRIPT
