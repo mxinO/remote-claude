@@ -8,8 +8,8 @@ When the user asks to work on a remote machine (e.g. "work on dev1", "let's use 
   This starts the remote server in that directory so relative paths work naturally.
 - Then use remote_bash, remote_read, remote_edit, remote_write, remote_glob, remote_grep
   as drop-in replacements for the local Bash, Read, Edit, Write, Glob, Grep tools.
-- All file paths should be absolute paths on the remote machine.
-  If a work_dir was set, relative paths resolve from there.
+- When work_dir is set, paths work exactly like working locally — use relative paths.
+  Without work_dir, use absolute paths on the remote machine.
 - Cluster names are defined in ~/.config/ssh-gateway-mcp/clusters.yaml.
   The user may also provide a raw hostname instead of a configured name.
 - Stay on the remote cluster for subsequent commands until the user says otherwise.
