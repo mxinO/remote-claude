@@ -1,37 +1,37 @@
-# ssh-gateway-mcp
+# Remote Claude
 
-MCP server that proxies Claude Code tools to remote clusters via SSH.
-
-Work on any remote cluster from a single local Claude Code session — no restart needed to add new clusters. The gateway connects on-demand and uses `claude mcp serve` on the remote side, giving you the exact same Edit, Read, Write, Bash, Glob, and Grep tools.
+Work on any remote cluster from a single local Claude Code session. Just say "work on dev1" and Claude connects on-demand via SSH, giving you the exact same Edit, Read, Write, Bash, Glob, and Grep tools — no restart needed.
 
 ## How it works
 
 ```
-Local Claude Code (MCP client)
+Local Claude Code
     │ stdio
-ssh-gateway-mcp (always-on, configured once)
-    │ SSH on-demand (ControlMaster-persisted)
-Remote: claude mcp serve (full Claude Code tools)
+Remote Claude (MCP gateway, always-on)
+    │ SSH on-demand (persistent session)
+Remote host: claude mcp serve
 ```
+
+The gateway proxies tool calls to `claude mcp serve` running on the remote host over a persistent SSH connection. You get full-fidelity Claude Code tools remotely with minimal token overhead.
 
 ## Install
 
 ```bash
-git clone <repo-url> && cd ssh-gateway-mcp
+git clone git@github.com:mxinO/remote-claude.git && cd remote-claude
 ./install.sh
 ```
 
 This will:
 1. Install the Python package
 2. Register the MCP server with Claude Code
-3. Generate `~/.config/ssh-gateway-mcp/clusters.yaml` from your `~/.ssh/config` (skips git forges like github/gitlab)
-4. Append usage instructions to `~/.claude/CLAUDE.md` (safe if you already have one)
+3. Generate `~/.config/ssh-gateway-mcp/clusters.yaml` from your `~/.ssh/config` (skips git forges)
+4. Add usage instructions to `~/.claude/CLAUDE.md` (updates safely on reinstall)
 
-Restart Claude Code to load the new MCP server.
+Restart Claude Code to load the MCP server.
 
 ## Configure clusters
 
-Create `~/.config/ssh-gateway-mcp/clusters.yaml`:
+Edit `~/.config/ssh-gateway-mcp/clusters.yaml`:
 
 ```yaml
 clusters:
@@ -64,11 +64,11 @@ Just talk to Claude naturally:
 > Switch to prod1 and check the logs
 ```
 
-Claude will automatically connect to the cluster and use the remote tools. No special syntax needed.
+Claude automatically connects to the cluster, sets the working directory, and uses remote tools. Relative paths work when a working directory is specified. No special syntax needed.
 
-## Prerequisites: Remote hosts
+## Prerequisites
 
-Each remote cluster needs Claude Code **installed and authenticated** before use:
+Each remote host needs Claude Code **installed and authenticated**:
 
 ```bash
 ssh user@remote-host
@@ -81,11 +81,13 @@ The gateway auto-detects the claude binary in common paths (`~/.local/bin/claude
 
 ## Features
 
+- **Natural language** — just say "work on dev1" and Claude handles the rest
+- **Full fidelity** — proxies to `claude mcp serve`, so you get Claude Code's exact Edit, Read, Write tools
+- **Working directory** — set a work_dir and use relative paths, just like working locally
 - **Auto-detect Claude Code** on remote hosts (searches common paths)
-- **SSH ControlMaster** for persistent, fast connections
 - **Ad-hoc hosts** — use any hostname, not just configured clusters
-- **Full fidelity** — proxies to `claude mcp serve`, so you get Claude Code's exact Edit tool with string-matching, indentation preservation, etc.
-- **Minimal token overhead** — thin tool descriptions, no duplication
+- **Minimal token overhead** — thin tool descriptions, no context bloat
+- **SSH config import** — install script reads `~/.ssh/config` to bootstrap cluster config
 
 ## Requirements
 
@@ -93,4 +95,4 @@ The gateway auto-detects the claude binary in common paths (`~/.local/bin/claude
 - `mcp` Python SDK
 - `pyyaml`
 - SSH access to remote clusters
-- Claude Code CLI installed and authenticated on remote hosts
+- Claude Code installed and authenticated on remote hosts
