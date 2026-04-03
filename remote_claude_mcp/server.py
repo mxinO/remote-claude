@@ -99,15 +99,14 @@ async def list_clusters() -> str:
 
 
 @server.tool(description="Same as Bash but runs on the active remote cluster.")
-async def remote_bash(
-    command: str, timeout: int = 120, description: str = ""
-) -> str:
+async def remote_bash(command: str, description: str = "") -> str:
     conn = _get_active()
     # Prepend cd to work_dir — the remote shell can have cwd races when
-    # auto-backgrounded commands (cd X && slow_cmd) change cwd mid-flight
+    # backgrounded commands (cd X && slow_cmd) change cwd mid-flight
     if conn.work_dir:
         command = f"cd {conn.work_dir} && {command}"
-    args = {"command": command, "timeout": timeout}
+    # Don't pass timeout — it causes auto-backgrounding on the remote.
+    args = {"command": command}
     if description:
         args["description"] = description
     return await conn.call_tool("Bash", args)
