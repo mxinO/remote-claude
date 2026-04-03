@@ -112,7 +112,6 @@ async def remote_bash(
         args["description"] = description
     if run_in_background:
         args["run_in_background"] = True
-        args["timeout"] = 2  # short timeout forces backgrounding in claude mcp serve
         result = await conn.call_tool("Bash", args)
         return _format_background_result(result, conn)
     return await conn.call_tool_with_progress("Bash", args, ctx)
@@ -197,7 +196,6 @@ async def remote_agent(
         args["subagent_type"] = subagent_type
     if run_in_background:
         args["run_in_background"] = True
-        args["timeout"] = 2  # short timeout forces backgrounding
         result = await conn.call_tool("Agent", args)
         return _format_background_result(result, conn)
     return await conn.call_tool_with_progress("Agent", args, ctx, progress_interval=10)
