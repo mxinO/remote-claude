@@ -40,16 +40,21 @@ def _get_active() -> RemoteConnection:
     description=(
         "Connect to a remote cluster and set it as active. "
         "Use a name from clusters.yaml config, or pass a raw hostname. "
-        "Auto-detects or installs Claude Code on the remote host."
+        "Optionally set a working directory — all relative paths will resolve from there."
     )
 )
-async def use_cluster(name: str) -> str:
+async def use_cluster(name: str, work_dir: str = "") -> str:
     global _active_cluster
 
-    # Already connected — just switch
+    # Already connected — switch, optionally change work_dir
     if name in _connections:
         _active_cluster = name
-        return f"Switched to cluster '{name}' ({_connections[name].cluster.host})"
+        if work_dir:
+            await _connections[name].close()
+            del _connections[name]
+            # Reconnect with new work_dir below
+        else:
+            return f"Switched to cluster '{name}' ({_connections[name].cluster.host})"
 
     # Resolve config
     if name in _config.clusters:
@@ -59,14 +64,15 @@ async def use_cluster(name: str) -> str:
         cluster = ClusterConfig(name=name, host=name)
 
     try:
-        conn = await connect(cluster)
+        conn = await connect(cluster, work_dir=work_dir)
     except Exception as e:
         return f"[ERROR] Failed to connect to '{name}': {e}"
 
     _connections[name] = conn
     _active_cluster = name
+    wd = f", work_dir={work_dir}" if work_dir else ""
     return (
-        f"Connected to '{name}' ({cluster.host}) — "
+        f"Connected to '{name}' ({cluster.host}{wd}) — "
         f"claude at {conn.claude_path}. Ready for remote_* commands."
     )
 

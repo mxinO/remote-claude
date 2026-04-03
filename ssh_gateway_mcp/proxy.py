@@ -180,9 +180,8 @@ async def find_claude_path(cluster: ClusterConfig) -> Optional[str]:
     return None
 
 
-async def connect(cluster: ClusterConfig) -> RemoteConnection:
+async def connect(cluster: ClusterConfig, work_dir: str = "") -> RemoteConnection:
     """Connect to a cluster: find claude, start MCP serve, do handshake."""
-
 
     # Step 1: Find claude (must be pre-installed and authenticated)
     claude_path = await find_claude_path(cluster)
@@ -193,8 +192,9 @@ async def connect(cluster: ClusterConfig) -> RemoteConnection:
 
     logger.info(f"Using claude at {claude_path} on {cluster.name}")
 
-    # Step 2: Start `claude mcp serve` over SSH
-    ssh_args = _build_ssh_args(cluster) + ["--", claude_path, "mcp", "serve"]
+    # Step 2: Start `claude mcp serve` over SSH, optionally in a working directory
+    remote_cmd = f"cd {work_dir} && {claude_path} mcp serve" if work_dir else f"{claude_path} mcp serve"
+    ssh_args = _build_ssh_args(cluster) + ["--", remote_cmd]
     proc = await asyncio.create_subprocess_exec(
         *ssh_args,
         stdin=asyncio.subprocess.PIPE,
