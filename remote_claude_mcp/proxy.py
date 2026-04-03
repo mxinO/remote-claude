@@ -276,8 +276,8 @@ async def connect(cluster: ClusterConfig, work_dir: str = "") -> RemoteConnectio
     )
 
     # Step 3: Start `claude mcp serve` over SSH, optionally in a working directory
-    # Write PID to file so we can clean up orphans. Use exec so the shell is
-    # replaced by claude — when SSH terminates, SIGHUP is sent directly to claude.
+    # Write PID file, then exec so stdin/stdout go directly to claude.
+    # Orphan cleanup relies on: PID file kill on reconnect + atexit SSH kill.
     cd_cmd = f"cd {work_dir} && " if work_dir else ""
     serve_cmd = f'{cd_cmd}echo $$ > {pidfile} && exec {claude_path} mcp serve'
     ssh_args = _build_ssh_args(cluster) + ["--", serve_cmd]

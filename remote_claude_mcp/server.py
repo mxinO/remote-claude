@@ -6,6 +6,7 @@ import atexit
 import asyncio
 import json
 import logging
+import signal
 from typing import Dict, Optional
 
 from mcp.server.fastmcp import Context, FastMCP
@@ -229,10 +230,17 @@ def _cleanup():
                 conn.process.kill()
 
 
+def _signal_handler(sig, frame):
+    _cleanup()
+    raise SystemExit(0)
+
+
 def run(config_path: str = None):
     global _config
     logging.basicConfig(level=logging.INFO, format="%(name)s: %(message)s")
     _config = load_config(config_path)
     logger.info(f"Loaded {len(_config.clusters)} cluster(s) from config")
     atexit.register(_cleanup)
+    signal.signal(signal.SIGTERM, _signal_handler)
+    signal.signal(signal.SIGINT, _signal_handler)
     server.run(transport="stdio")
