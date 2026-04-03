@@ -100,6 +100,47 @@ class RemoteConnection:
         resp = await self.send_request(
             "tools/call", {"name": tool_name, "arguments": arguments}
         )
+        return self._extract_result(resp)
+
+    async def call_tool_with_progress(
+        self, tool_name: str, arguments: dict, ctx, progress_interval: int = 5
+    ) -> str:
+        """Call a tool, reporting progress to ctx while waiting for the response."""
+        req_id = self.next_id()
+        request = {"jsonrpc": "2.0", "id": req_id, "method": "tools/call",
+                    "params": {"name": tool_name, "arguments": arguments}}
+        data = json.dumps(request) + "\n"
+
+        future = asyncio.get_event_loop().create_future()
+        self._pending[req_id] = future
+
+        try:
+            self.process.stdin.write(data.encode())
+            await self.process.stdin.drain()
+
+            elapsed = 0
+            while True:
+                try:
+                    result = await asyncio.wait_for(
+                        asyncio.shield(future), timeout=progress_interval
+                    )
+                    return self._extract_result(result)
+                except asyncio.TimeoutError:
+                    elapsed += progress_interval
+                    if ctx:
+                        await ctx.report_progress(
+                            elapsed, elapsed + 60,
+                            f"Running on remote ({elapsed}s)..."
+                        )
+                    # Safety: give up after 10 minutes
+                    if elapsed > 600:
+                        return "[ERROR] Remote command timed out after 600s"
+        finally:
+            self._pending.pop(req_id, None)
+
+    @staticmethod
+    def _extract_result(resp: dict) -> str:
+        """Extract text result from a JSON-RPC response."""
         if "error" in resp:
             err = resp["error"]
             return f"[ERROR] {err.get('message', str(err))}"
