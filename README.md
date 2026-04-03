@@ -24,7 +24,7 @@ git clone <repo-url> && cd ssh-gateway-mcp
 This will:
 1. Install the Python package
 2. Register the MCP server with Claude Code
-3. Create a default config at `~/.config/ssh-gateway-mcp/clusters.yaml`
+3. Generate `~/.config/ssh-gateway-mcp/clusters.yaml` from your `~/.ssh/config` (skips git forges like github/gitlab)
 4. Append usage instructions to `~/.claude/CLAUDE.md` (safe if you already have one)
 
 Restart Claude Code to load the new MCP server.
