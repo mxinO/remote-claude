@@ -15,8 +15,9 @@ When the user asks to work on a remote machine (e.g. "work on dev1", "let's use 
 - Cluster names are defined in ~/.config/remote-claude-mcp/clusters.yaml.
   The user may also provide a raw hostname instead of a configured name.
 - Stay on the remote cluster for subsequent commands until the user says otherwise.
-- IMPORTANT: remote_bash and remote_agent do NOT support run_in_background. All remote
-  commands block until completion (max 10 minutes). Do not attempt to background remote
-  commands or agents. For long-running tasks, suggest the user run them manually via SSH,
-  or break into shorter steps.
+- Remote commands block until completion by default (max 10 minutes with heartbeat).
+- run_in_background is supported for remote_bash and remote_agent, but there are no
+  automatic notifications when they finish. The result includes the task ID and a
+  command to check status manually. Use this for long-running tasks where blocking
+  is not acceptable.
 <!-- END remote-claude-mcp -->

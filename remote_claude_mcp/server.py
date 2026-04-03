@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import atexit
 import asyncio
+import json
 import logging
 from typing import Dict, Optional
 
@@ -99,13 +100,20 @@ async def list_clusters() -> str:
 
 
 @server.tool(description="Same as Bash but runs on the active remote cluster.")
-async def remote_bash(command: str, description: str = "", ctx: Context = None) -> str:
+async def remote_bash(
+    command: str, description: str = "",
+    run_in_background: bool = False, ctx: Context = None,
+) -> str:
     conn = _get_active()
     if conn.work_dir:
         command = f"cd {conn.work_dir} && {command}"
     args = {"command": command}
     if description:
         args["description"] = description
+    if run_in_background:
+        args["run_in_background"] = True
+        result = await conn.call_tool("Bash", args)
+        return _format_background_result(result, conn)
     return await conn.call_tool_with_progress("Bash", args, ctx)
 
 
@@ -179,13 +187,46 @@ async def remote_grep(
 
 @server.tool(description="Same as Agent but runs on the active remote cluster. Spawns a sub-agent remotely.")
 async def remote_agent(
-    prompt: str, description: str = "", subagent_type: str = "", ctx: Context = None
+    prompt: str, description: str = "", subagent_type: str = "",
+    run_in_background: bool = False, ctx: Context = None,
 ) -> str:
     conn = _get_active()
     args = {"prompt": prompt, "description": description or "remote sub-agent"}
     if subagent_type:
         args["subagent_type"] = subagent_type
+    if run_in_background:
+        args["run_in_background"] = True
+        result = await conn.call_tool("Agent", args)
+        return _format_background_result(result, conn)
     return await conn.call_tool_with_progress("Agent", args, ctx, progress_interval=10)
+
+
+async def _find_task_output_file(conn: RemoteConnection, task_id: str) -> str:
+    """Find the output file for a background task on the remote host."""
+    result = await conn.call_tool("Bash", {
+        "command": f"find /tmp -name '{task_id}.output' 2>/dev/null | head -1"
+    })
+    try:
+        return json.loads(result).get("stdout", "").strip()
+    except (json.JSONDecodeError, TypeError):
+        return ""
+
+
+def _format_background_result(result: str, conn: RemoteConnection) -> str:
+    """Format a background task result with task ID and output file info."""
+    try:
+        parsed = json.loads(result)
+        task_id = parsed.get("backgroundTaskId", "")
+        if task_id:
+            return (
+                f"Background task started on remote: {task_id}\n"
+                f"Output file: /tmp/claude-*/*/tasks/{task_id}.output (on remote)\n"
+                f"Use remote_read or remote_bash to check status manually:\n"
+                f"  remote_bash(command=\"cat $(find /tmp -name '{task_id}.output' 2>/dev/null)\")"
+            )
+    except (json.JSONDecodeError, TypeError):
+        pass
+    return result
 
 
 def _cleanup():

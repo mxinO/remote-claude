@@ -91,11 +91,13 @@ The gateway auto-detects the claude binary in common paths (`~/.local/bin/claude
 
 ## Limitations
 
-**Background tasks are not supported.** Remote commands block until they complete. The MCP protocol does not support push notifications from server to client, so there's no way to replicate Claude Code's local `Bash(run_in_background=true)` + `<task-notification>` pattern through MCP. Progress heartbeats keep the connection alive for commands up to 10 minutes.
+**Background tasks have limited support.** `run_in_background=true` works for `remote_bash` and `remote_agent` — the command starts on the remote and the task ID + output file path are returned. However, there are **no automatic notifications** when the task finishes. You must manually check the output file with `remote_bash` or `remote_read`.
+
+This is because the MCP protocol does not support push notifications from server to client, so there's no way to replicate Claude Code's local `<task-notification>` pattern through MCP.
 
 See [anthropics/claude-code#18617](https://github.com/anthropics/claude-code/issues/18617) for discussion on MCP background task support.
 
-For truly long-running commands, run them manually via SSH or break them into shorter steps.
+By default, remote commands block until completion with progress heartbeats (up to 10 minutes).
 
 ## Requirements
 
