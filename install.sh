@@ -8,8 +8,8 @@ pip install -e "$(dirname "$0")" || pip install -e "$(dirname "$0")" --user
 
 # Register MCP server with Claude Code
 PYTHON_BIN=$(which python3 || which python)
-claude mcp remove remote-claude 2>/dev/null || true
-claude mcp add remote-claude -- "$PYTHON_BIN" -m remote_claude_mcp
+claude mcp remove remote-claude --scope user 2>/dev/null || true
+claude mcp add remote-claude --scope user -- "$PYTHON_BIN" -m remote_claude_mcp
 
 # Create config from ~/.ssh/config if available, otherwise use example
 CONFIG_DIR="$HOME/.config/remote-claude-mcp"
