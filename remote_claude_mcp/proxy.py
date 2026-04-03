@@ -34,7 +34,6 @@ class RemoteConnection:
     cluster: ClusterConfig
     process: asyncio.subprocess.Process
     claude_path: str
-    work_dir: str = ""
     _id_counter: int = 0
     _pending: Dict[int, asyncio.Future] = field(default_factory=dict)
     _read_task: Optional[asyncio.Task] = None
@@ -214,7 +213,7 @@ async def connect(cluster: ClusterConfig, work_dir: str = "") -> RemoteConnectio
         stderr=asyncio.subprocess.PIPE,
     )
 
-    conn = RemoteConnection(cluster=cluster, process=proc, claude_path=claude_path, work_dir=work_dir)
+    conn = RemoteConnection(cluster=cluster, process=proc, claude_path=claude_path)
     await conn.start_read_loop()
 
     # Step 3: MCP handshake
