@@ -103,6 +103,10 @@ async def remote_bash(
     command: str, timeout: int = 120, description: str = ""
 ) -> str:
     conn = _get_active()
+    # Prepend cd to work_dir — the remote shell can have cwd races when
+    # auto-backgrounded commands (cd X && slow_cmd) change cwd mid-flight
+    if conn.work_dir:
+        command = f"cd {conn.work_dir} && {command}"
     args = {"command": command, "timeout": timeout}
     if description:
         args["description"] = description
