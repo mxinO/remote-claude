@@ -89,6 +89,14 @@ The gateway auto-detects the claude binary in common paths (`~/.local/bin/claude
 - **Minimal token overhead** — thin tool descriptions, no context bloat
 - **SSH config import** — install script reads `~/.ssh/config` to bootstrap cluster config
 
+## Limitations
+
+**Background tasks are not supported.** Remote commands block until they complete. The MCP protocol does not support push notifications from server to client, so there's no way to replicate Claude Code's local `Bash(run_in_background=true)` + `<task-notification>` pattern through MCP. Progress heartbeats keep the connection alive for commands up to 10 minutes.
+
+See [anthropics/claude-code#18617](https://github.com/anthropics/claude-code/issues/18617) for discussion on MCP background task support.
+
+For truly long-running commands, run them manually via SSH or break them into shorter steps.
+
 ## Requirements
 
 - Python 3.10+
