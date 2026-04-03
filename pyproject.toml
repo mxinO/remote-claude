@@ -3,8 +3,8 @@ requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "ssh-gateway-mcp"
-version = "0.1.0"
+name = "remote-claude-mcp"
+version = "1.0.0"
 description = "MCP server that proxies Claude Code tools to remote clusters via SSH"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -14,4 +14,4 @@ dependencies = [
 ]
 
 [project.scripts]
-ssh-gateway-mcp = "ssh_gateway_mcp.__main__:main"
+remote-claude-mcp = "remote_claude_mcp.__main__:main"

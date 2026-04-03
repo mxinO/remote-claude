@@ -1,4 +1,4 @@
-"""SSH MCP proxy — manages SSH connections to remote `claude mcp serve` instances."""
+"""Remote Claude proxy — manages SSH connections to remote `claude mcp serve` instances."""
 
 from __future__ import annotations
 
@@ -220,7 +220,7 @@ async def connect(cluster: ClusterConfig, work_dir: str = "") -> RemoteConnectio
     resp = await conn.send_request("initialize", {
         "protocolVersion": "2024-11-05",
         "capabilities": {},
-        "clientInfo": {"name": "ssh-gateway-mcp", "version": "0.1.0"},
+        "clientInfo": {"name": "remote-claude-mcp", "version": "1.0.0"},
     })
 
     if "error" in resp:

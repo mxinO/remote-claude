@@ -1,4 +1,4 @@
-"""SSH Gateway MCP Server — FastMCP server with tools that proxy to remote clusters."""
+"""Remote Claude MCP Server — FastMCP server with tools that proxy to remote clusters."""
 
 from __future__ import annotations
 
@@ -15,9 +15,9 @@ from .proxy import RemoteConnection, connect
 logger = logging.getLogger(__name__)
 
 server = FastMCP(
-    name="ssh-gateway",
+    name="remote-claude",
     instructions=(
-        "SSH gateway for remote clusters. Call use_cluster(name) first to connect, "
+        "Remote Claude for remote clusters. Call use_cluster(name) first to connect, "
         "then use remote_* tools which work exactly like their local counterparts "
         "(Bash, Read, Edit, Write, Glob, Grep) but execute on the remote cluster."
     ),
@@ -94,7 +94,7 @@ async def list_clusters() -> str:
             lines.append(f"  {name}: {_connections[name].cluster.host} [connected, ad-hoc]{active}")
 
     if not lines:
-        return "No clusters configured. Add clusters to ~/.config/ssh-gateway-mcp/clusters.yaml"
+        return "No clusters configured. Add clusters to ~/.config/remote-claude-mcp/clusters.yaml"
     return "Clusters:\n" + "\n".join(lines)
 
 

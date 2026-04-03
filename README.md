@@ -24,14 +24,14 @@ git clone git@github.com:mxinO/remote-claude.git && cd remote-claude
 This will:
 1. Install the Python package
 2. Register the MCP server with Claude Code
-3. Generate `~/.config/ssh-gateway-mcp/clusters.yaml` from your `~/.ssh/config` (skips git forges)
+3. Generate `~/.config/remote-claude-mcp/clusters.yaml` from your `~/.ssh/config` (skips git forges)
 4. Add usage instructions to `~/.claude/CLAUDE.md` (updates safely on reinstall)
 
 Restart Claude Code to load the MCP server.
 
 ## Configure clusters
 
-Edit `~/.config/ssh-gateway-mcp/clusters.yaml`:
+Edit `~/.config/remote-claude-mcp/clusters.yaml`:
 
 ```yaml
 clusters:
@@ -48,7 +48,7 @@ clusters:
     user: myuser
 ```
 
-Or set `SSH_GATEWAY_MCP_CONFIG=/path/to/clusters.yaml`.
+Or set `REMOTE_CLAUDE_MCP_CONFIG=/path/to/clusters.yaml`.
 
 ## Usage
 

@@ -10,7 +10,8 @@ from typing import Dict, Optional
 import yaml
 
 DEFAULT_CONFIG_PATHS = [
-    Path.home() / ".config" / "ssh-gateway-mcp" / "clusters.yaml",
+    Path.home() / ".config" / "remote-claude-mcp" / "clusters.yaml",
+    Path.home() / ".config" / "ssh-gateway-mcp" / "clusters.yaml",  # backward compat
     Path("clusters.yaml"),
 ]
 
@@ -37,8 +38,8 @@ def load_config(path: Optional[str] = None) -> Config:
 
     if path:
         config_path = Path(path)
-    elif os.environ.get("SSH_GATEWAY_MCP_CONFIG"):
-        config_path = Path(os.environ["SSH_GATEWAY_MCP_CONFIG"])
+    elif os.environ.get("REMOTE_CLAUDE_MCP_CONFIG") or os.environ.get("SSH_GATEWAY_MCP_CONFIG"):
+        config_path = Path(os.environ.get("REMOTE_CLAUDE_MCP_CONFIG") or os.environ["SSH_GATEWAY_MCP_CONFIG"])
     else:
         for p in DEFAULT_CONFIG_PATHS:
             if p.exists():

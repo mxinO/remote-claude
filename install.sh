@@ -1,18 +1,20 @@
 #!/bin/bash
 set -e
 
-echo "Installing ssh-gateway-mcp..."
+echo "Installing remote-claude-mcp..."
 
 # Install Python package
 pip install -e "$(dirname "$0")" || pip install -e "$(dirname "$0")" --user
 
 # Register MCP server with Claude Code
 PYTHON_BIN=$(which python3 || which python)
+claude mcp remove remote-claude 2>/dev/null || true
+# Also remove old name in case upgrading from ssh-gateway
 claude mcp remove ssh-gateway 2>/dev/null || true
-claude mcp add ssh-gateway -- "$PYTHON_BIN" -m ssh_gateway_mcp
+claude mcp add remote-claude -- "$PYTHON_BIN" -m remote_claude_mcp
 
 # Create config from ~/.ssh/config if available, otherwise use example
-CONFIG_DIR="$HOME/.config/ssh-gateway-mcp"
+CONFIG_DIR="$HOME/.config/remote-claude-mcp"
 if [ ! -f "$CONFIG_DIR/clusters.yaml" ]; then
     mkdir -p "$CONFIG_DIR"
     if [ -f "$HOME/.ssh/config" ]; then
