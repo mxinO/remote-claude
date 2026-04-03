@@ -1,8 +1,8 @@
-<!-- BEGIN ssh-gateway-mcp -->
-## Remote clusters (ssh-gateway-mcp)
+<!-- BEGIN remote-claude-mcp -->
+## Remote clusters (remote-claude-mcp)
 
 When the user asks to work on a remote machine (e.g. "work on dev1", "let's use the prod cluster",
-"edit files on my-host.example.com"), use the ssh-gateway MCP tools:
+"edit files on my-host.example.com"), use the remote-claude MCP tools:
 - First call use_cluster() with the cluster name or hostname to connect.
 - If the user specifies a working directory, pass it as work_dir to use_cluster().
   This starts the remote server in that directory so relative paths work naturally.
@@ -15,4 +15,4 @@ When the user asks to work on a remote machine (e.g. "work on dev1", "let's use 
 - Cluster names are defined in ~/.config/remote-claude-mcp/clusters.yaml.
   The user may also provide a raw hostname instead of a configured name.
 - Stay on the remote cluster for subsequent commands until the user says otherwise.
-<!-- END ssh-gateway-mcp -->
+<!-- END remote-claude-mcp -->

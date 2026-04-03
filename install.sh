@@ -106,14 +106,17 @@ fi
 # Update CLAUDE.md instructions (replace if exists, append if not)
 CLAUDE_MD="$HOME/.claude/CLAUDE.md"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-MARKER_START="<!-- BEGIN ssh-gateway-mcp -->"
-MARKER_END="<!-- END ssh-gateway-mcp -->"
+MARKER_START="<!-- BEGIN remote-claude-mcp -->"
+MARKER_END="<!-- END remote-claude-mcp -->"
+OLD_MARKER_START="<!-- BEGIN ssh-gateway-mcp -->"
+OLD_MARKER_END="<!-- END ssh-gateway-mcp -->"
 INSTRUCTIONS="$(cat "$SCRIPT_DIR/claude_md_instructions.md")"
 
 mkdir -p "$HOME/.claude"
-if [ -f "$CLAUDE_MD" ] && grep -qF "$MARKER_START" "$CLAUDE_MD"; then
-    # Replace existing block between markers (inclusive)
-    python3 - "$CLAUDE_MD" "$MARKER_START" "$MARKER_END" "$INSTRUCTIONS" << 'PYSCRIPT'
+
+# Helper to replace a block between markers
+replace_block() {
+    python3 - "$CLAUDE_MD" "$1" "$2" "$INSTRUCTIONS" << 'PYSCRIPT'
 import sys
 path, start_marker, end_marker, new_content = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 with open(path) as f:
@@ -121,19 +124,25 @@ with open(path) as f:
 start = content.find(start_marker)
 end = content.find(end_marker)
 if start == -1 or end == -1:
-    sys.exit(0)
+    sys.exit(1)
 end += len(end_marker)
-# Skip trailing newline after end marker
 if end < len(content) and content[end] == '\n':
     end += 1
 with open(path, 'w') as f:
     f.write(content[:start] + new_content.rstrip() + '\n' + content[end:])
 PYSCRIPT
-    echo "Updated ssh-gateway instructions in $CLAUDE_MD"
+}
+
+if [ -f "$CLAUDE_MD" ] && grep -qF "$MARKER_START" "$CLAUDE_MD"; then
+    replace_block "$MARKER_START" "$MARKER_END"
+    echo "Updated remote-claude instructions in $CLAUDE_MD"
+elif [ -f "$CLAUDE_MD" ] && grep -qF "$OLD_MARKER_START" "$CLAUDE_MD"; then
+    # Upgrade from old ssh-gateway-mcp markers
+    replace_block "$OLD_MARKER_START" "$OLD_MARKER_END"
+    echo "Upgraded ssh-gateway-mcp -> remote-claude-mcp instructions in $CLAUDE_MD"
 else
-    # Append new block
     printf "\n%s\n" "$INSTRUCTIONS" >> "$CLAUDE_MD"
-    echo "Appended ssh-gateway instructions to $CLAUDE_MD"
+    echo "Appended remote-claude instructions to $CLAUDE_MD"
 fi
 
 echo ""
