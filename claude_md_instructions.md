@@ -20,5 +20,6 @@ When the user asks to work on a remote machine (e.g. "work on dev1", "let's use 
   This is faster (~160ms vs ~8s), supports run_in_background with local harness
   notifications (<task-notification>), and behaves exactly like local Bash.
   The `remote-claude` CLI uses SSH ControlMaster to reuse the existing connection.
+- When spawning sub-agents for remote work, tell them we are working on a remote machine.
 - If you are a sub-agent, do NOT call use_cluster() — the connection is already active.
 <!-- END remote-claude-mcp -->
