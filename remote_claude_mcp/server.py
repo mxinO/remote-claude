@@ -120,22 +120,27 @@ async def list_clusters() -> str:
     return "Clusters:\n" + "\n".join(lines)
 
 
-@server.tool(description="Same as Bash but runs on the active remote cluster.")
-async def remote_bash(
-    command: str, description: str = "",
-    run_in_background: bool = False, ctx: Context = None,
-) -> str:
-    conn = _get_active()
-    if conn.work_dir:
-        command = f"cd {conn.work_dir} && {command}"
-    args = {"command": command}
-    if description:
-        args["description"] = description
-    if run_in_background:
-        args["run_in_background"] = True
-        result = await conn.call_tool("Bash", args)
-        return await _format_background_result(result, conn)
-    return await conn.call_tool_with_progress("Bash", args, ctx)
+# remote_bash is disabled — use Bash("remote-claude <cmd>") instead, which is
+# faster (~160ms vs ~8s), supports run_in_background with local harness
+# notifications, and behaves exactly like local Bash. Re-enable if MCP adds
+# background task notification support (see anthropics/claude-code#18617).
+#
+# @server.tool(description="Same as Bash but runs on the active remote cluster.")
+# async def remote_bash(
+#     command: str, description: str = "",
+#     run_in_background: bool = False, ctx: Context = None,
+# ) -> str:
+#     conn = _get_active()
+#     if conn.work_dir:
+#         command = f"cd {conn.work_dir} && {command}"
+#     args = {"command": command}
+#     if description:
+#         args["description"] = description
+#     if run_in_background:
+#         args["run_in_background"] = True
+#         result = await conn.call_tool("Bash", args)
+#         return await _format_background_result(result, conn)
+#     return await conn.call_tool_with_progress("Bash", args, ctx)
 
 
 @server.tool(description="Same as Read but runs on the active remote cluster.")
