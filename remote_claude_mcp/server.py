@@ -67,17 +67,17 @@ def _get_active() -> RemoteConnection:
 async def use_cluster(name: str, work_dir: str = "") -> str:
     global _active_cluster
 
-    # Already connected — switch, optionally change work_dir
+    # Already connected — check if still alive, switch or reconnect
     if name in _connections:
-        _active_cluster = name
         conn = _connections[name]
-        if work_dir and work_dir != conn.work_dir:
-            await conn.close()
-            del _connections[name]
-            # Reconnect with new work_dir below
-        else:
+        alive = conn.process.returncode is None
+        if alive and (not work_dir or work_dir == conn.work_dir):
+            _active_cluster = name
             _write_active_state(conn.cluster, conn.work_dir)
             return f"Switched to cluster '{name}' ({conn.cluster.host})"
+        # Dead or work_dir changed — reconnect
+        await conn.close()
+        del _connections[name]
 
     # Resolve config
     if name in _config.clusters:
