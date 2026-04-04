@@ -20,7 +20,4 @@ When the user asks to work on a remote machine (e.g. "work on dev1", "let's use 
   This is faster (~160ms vs ~8s), supports run_in_background with local harness
   notifications (<task-notification>), and behaves exactly like local Bash.
   The `remote-claude` CLI uses SSH ControlMaster to reuse the existing connection.
-- When spawning sub-agents (Agent tool) for remote work, include in the prompt that
-  they should use Bash("remote-claude <cmd>") for commands and remote_* MCP tools
-  for file operations. Sub-agents don't inherit conversation context.
 <!-- END remote-claude-mcp -->
