@@ -6,13 +6,19 @@ Work on any remote cluster from a single local Claude Code session. Just say "wo
 
 ```
 Local Claude Code
-    │ stdio
-Remote Claude (MCP gateway, always-on)
-    │ SSH on-demand (persistent session)
-Remote host: claude mcp serve
+    │
+    ├── MCP gateway (file tools: Read, Edit, Write, Glob, Grep)
+    │       │ SSH (persistent session)
+    │       └── Remote: claude mcp serve
+    │
+    └── remote-claude CLI (bash commands)
+            │ SSH (ControlMaster, reuses gateway connection)
+            └── Remote: runs command directly
 ```
 
-The gateway proxies tool calls to `claude mcp serve` running on the remote host over a persistent SSH connection. You get full-fidelity Claude Code tools remotely with minimal token overhead.
+**File operations** (Read, Edit, Write, Glob, Grep) go through the MCP gateway which proxies to `claude mcp serve` on the remote — giving you Claude Code's exact tool implementations.
+
+**Bash commands** use the `remote-claude` CLI via the local Bash tool. This is faster (~160ms vs ~8s), supports `run_in_background` with local notifications, and reuses the gateway's SSH connection via ControlMaster.
 
 ## Install
 
@@ -22,7 +28,7 @@ git clone git@github.com:mxinO/remote-claude.git && cd remote-claude
 ```
 
 This will:
-1. Install the Python package
+1. Install the Python package (`remote-claude-mcp` + `remote-claude` CLI)
 2. Register the MCP server with Claude Code
 3. Generate `~/.config/remote-claude-mcp/clusters.yaml` from your `~/.ssh/config` (skips git forges)
 4. Add usage instructions to `~/.claude/CLAUDE.md` (updates safely on reinstall)
@@ -66,6 +72,18 @@ Just talk to Claude naturally:
 
 Claude automatically connects to the cluster, sets the working directory, and uses remote tools. Relative paths work when a working directory is specified. No special syntax needed.
 
+## How Claude uses it
+
+| Operation | Tool | Path |
+|-----------|------|------|
+| Run commands | `Bash("remote-claude <cmd>")` | Local Bash → SSH → remote |
+| Read files | `remote_read` | MCP → claude mcp serve |
+| Edit files | `remote_edit` | MCP → claude mcp serve |
+| Write files | `remote_write` | MCP → claude mcp serve |
+| Find files | `remote_glob` | MCP → claude mcp serve |
+| Search code | `remote_grep` | MCP → claude mcp serve |
+| Background tasks | `Bash("remote-claude <cmd>", run_in_background=true)` | Local harness notifications |
+
 ## Prerequisites
 
 Each remote host needs Claude Code **installed and authenticated**:
@@ -83,21 +101,20 @@ The gateway auto-detects the claude binary in common paths (`~/.local/bin/claude
 
 - **Natural language** — just say "work on dev1" and Claude handles the rest
 - **Full fidelity** — proxies to `claude mcp serve`, so you get Claude Code's exact Edit, Read, Write tools
+- **Fast bash** — `remote-claude` CLI runs commands in ~160ms via SSH ControlMaster
+- **Background tasks** — `run_in_background` works with local harness notifications via `remote-claude` CLI
 - **Working directory** — set a work_dir and use relative paths, just like working locally
 - **Auto-detect Claude Code** on remote hosts (searches common paths)
 - **Ad-hoc hosts** — use any hostname, not just configured clusters
 - **Minimal token overhead** — thin tool descriptions, no context bloat
 - **SSH config import** — install script reads `~/.ssh/config` to bootstrap cluster config
+- **Orphan cleanup** — PID files + signal handlers prevent zombie remote processes
 
 ## Limitations
 
-**Background tasks have limited support.** `run_in_background=true` works for `remote_bash` and `remote_agent` — the command starts on the remote and the task ID + output file path are returned. However, there are **no automatic notifications** when the task finishes. You must manually check the output file with `remote_bash` or `remote_read`.
-
-This is because the MCP protocol does not support push notifications from server to client, so there's no way to replicate Claude Code's local `<task-notification>` pattern through MCP.
+The MCP protocol does not support push notifications from server to client. This means `remote_bash` MCP tool calls cannot receive `<task-notification>` when backgrounded. Use `Bash("remote-claude <cmd>", run_in_background=true)` instead for background tasks with notifications.
 
 See [anthropics/claude-code#18617](https://github.com/anthropics/claude-code/issues/18617) for discussion on MCP background task support.
-
-By default, remote commands block until completion with progress heartbeats (up to 10 minutes).
 
 ## Requirements
 
