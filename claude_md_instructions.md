@@ -18,6 +18,9 @@ When the user asks to work on a remote machine (e.g. "work on dev1", "let's use 
 - Remote commands block until completion by default (max 10 minutes with heartbeat).
 - run_in_background is supported for remote_bash, but there are no automatic
   notifications when they finish. The result includes the task ID and output file
-  path. Use remote_read to check status manually. Use this for long-running tasks
-  where blocking is not acceptable.
+  path. Use remote_read to check status manually.
+- For background tasks that need local harness notifications, use the `remote` CLI
+  with local Bash instead: Bash(command="remote <cmd>", run_in_background=true).
+  This runs the command on the active cluster via SSH ControlMaster and gets
+  <task-notification> when done — same as local background tasks.
 <!-- END remote-claude-mcp -->

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 
@@ -201,12 +202,18 @@ class RemoteConnection:
             pass
 
 
+CONTROL_DIR = os.path.expanduser("~/.ssh/controlmasters")
+
 def _build_ssh_args(cluster: ClusterConfig) -> list[str]:
     """Build SSH command args from cluster config."""
+    os.makedirs(CONTROL_DIR, exist_ok=True)
     args = [
         "ssh",
         "-o", "BatchMode=yes",
         "-o", "StrictHostKeyChecking=accept-new",
+        "-o", "ControlMaster=auto",
+        "-o", f"ControlPath={CONTROL_DIR}/%r@%h:%p",
+        "-o", "ControlPersist=600",
     ]
     if cluster.ssh_key:
         args.extend(["-i", cluster.ssh_key])

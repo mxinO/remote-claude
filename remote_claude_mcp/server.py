@@ -12,7 +12,9 @@ from typing import Dict, Optional
 from mcp.server.fastmcp import Context, FastMCP
 
 from .config import ClusterConfig, Config, load_config
-from .proxy import RemoteConnection, connect
+from .proxy import RemoteConnection, connect, _build_ssh_args
+
+ACTIVE_STATE_FILE = "/tmp/remote-claude-active.json"
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +31,21 @@ server = FastMCP(
 _config: Config = Config()
 _connections: Dict[str, RemoteConnection] = {}
 _active_cluster: Optional[str] = None
+
+
+def _write_active_state(cluster: ClusterConfig, work_dir: str = ""):
+    """Write active cluster state so the `remote` CLI can read it."""
+    state = {
+        "name": cluster.name,
+        "host": cluster.host,
+        "user": cluster.user,
+        "work_dir": work_dir,
+        "ssh_key": cluster.ssh_key,
+        "jump_proxy": cluster.jump_proxy,
+        "port": cluster.port,
+    }
+    with open(ACTIVE_STATE_FILE, "w") as f:
+        json.dump(state, f)
 
 
 def _get_active() -> RemoteConnection:
@@ -58,7 +75,9 @@ async def use_cluster(name: str, work_dir: str = "") -> str:
             del _connections[name]
             # Reconnect with new work_dir below
         else:
-            return f"Switched to cluster '{name}' ({_connections[name].cluster.host})"
+            conn = _connections[name]
+            _write_active_state(conn.cluster, conn.work_dir)
+            return f"Switched to cluster '{name}' ({conn.cluster.host})"
 
     # Resolve config
     if name in _config.clusters:
@@ -74,6 +93,7 @@ async def use_cluster(name: str, work_dir: str = "") -> str:
 
     _connections[name] = conn
     _active_cluster = name
+    _write_active_state(cluster, work_dir)
     wd = f", work_dir={work_dir}" if work_dir else ""
     return (
         f"Connected to '{name}' ({cluster.host}{wd}) — "
