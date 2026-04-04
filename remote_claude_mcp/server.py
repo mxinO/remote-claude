@@ -70,12 +70,13 @@ async def use_cluster(name: str, work_dir: str = "") -> str:
     # Already connected — check if still alive, switch or reconnect
     if name in _connections:
         conn = _connections[name]
-        alive = conn.process.returncode is None
+        alive = conn.process.returncode is None and await conn._heartbeat()
         if alive and (not work_dir or work_dir == conn.work_dir):
             _active_cluster = name
             _write_active_state(conn.cluster, conn.work_dir)
             return f"Switched to cluster '{name}' ({conn.cluster.host})"
         # Dead or work_dir changed — reconnect
+        logger.info(f"Reconnecting to '{name}' (alive={alive})")
         await conn.close()
         del _connections[name]
 
