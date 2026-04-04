@@ -15,8 +15,8 @@ When the user asks to work on a remote machine (e.g. "work on dev1", "let's use 
 - Cluster names are defined in ~/.config/remote-claude-mcp/clusters.yaml.
   The user may also provide a raw hostname instead of a configured name.
 - Stay on the remote cluster for subsequent commands until the user says otherwise.
-- IMPORTANT: Do NOT use remote_bash for running commands. Instead, use the local Bash
-  tool with the `remote-claude` CLI prefix: Bash(command="remote-claude <cmd>").
+- IMPORTANT: remote_bash is NOT available. You **MUST** use the local Bash tool with
+  the `remote-claude` CLI prefix: Bash(command="remote-claude <cmd>").
   This is faster (~160ms vs ~8s), supports run_in_background with local harness
   notifications (<task-notification>), and behaves exactly like local Bash.
   The `remote-claude` CLI uses SSH ControlMaster to reuse the existing connection.
