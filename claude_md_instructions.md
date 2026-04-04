@@ -20,6 +20,14 @@ When the user asks to work on a remote machine (e.g. "work on dev1", "let's use 
   This is faster (~160ms vs ~8s), supports run_in_background with local harness
   notifications (<task-notification>), and behaves exactly like local Bash.
   The `remote-claude` CLI uses SSH ControlMaster to reuse the existing connection.
-- The remote connection persists across the session. Only call use_cluster() once
-  per cluster (or when changing work_dir). If already connected, just use the tools.
+- When spawning sub-agents for remote work, tell them in the prompt that we are working
+  on a remote machine and to use remote tools. Do NOT let sub-agents call use_cluster().
+
+### For sub-agents
+
+If you are a sub-agent and the prompt mentions working remotely or on a remote cluster:
+- Do NOT call use_cluster() — the connection is already established by the main agent.
+- Use remote_read, remote_edit, remote_write, remote_glob, remote_grep for file ops.
+- Use Bash("remote-claude <cmd>") for running commands.
+- These tools are already connected — just use them directly.
 <!-- END remote-claude-mcp -->
