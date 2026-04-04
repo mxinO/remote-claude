@@ -70,12 +70,12 @@ async def use_cluster(name: str, work_dir: str = "") -> str:
     # Already connected — switch, optionally change work_dir
     if name in _connections:
         _active_cluster = name
-        if work_dir:
-            await _connections[name].close()
+        conn = _connections[name]
+        if work_dir and work_dir != conn.work_dir:
+            await conn.close()
             del _connections[name]
             # Reconnect with new work_dir below
         else:
-            conn = _connections[name]
             _write_active_state(conn.cluster, conn.work_dir)
             return f"Switched to cluster '{name}' ({conn.cluster.host})"
 
