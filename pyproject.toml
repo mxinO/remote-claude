@@ -15,4 +15,4 @@ dependencies = [
 
 [project.scripts]
 remote-claude-mcp = "remote_claude_mcp.__main__:main"
-remote = "remote_claude_mcp.cli:main"
+remote-claude = "remote_claude_mcp.cli:main"

@@ -20,7 +20,7 @@ When the user asks to work on a remote machine (e.g. "work on dev1", "let's use 
   notifications when they finish. The result includes the task ID and output file
   path. Use remote_read to check status manually.
 - For background tasks that need local harness notifications, use the `remote` CLI
-  with local Bash instead: Bash(command="remote <cmd>", run_in_background=true).
+  with local Bash instead: Bash(command="remote-claude <cmd>", run_in_background=true).
   This runs the command on the active cluster via SSH ControlMaster and gets
   <task-notification> when done — same as local background tasks.
 <!-- END remote-claude-mcp -->
