@@ -40,6 +40,7 @@ class RemoteConnection:
     _id_counter: int = 0
     _pending: Dict[int, asyncio.Future] = field(default_factory=dict)
     _read_task: Optional[asyncio.Task] = None
+    _dead: bool = False
 
     def next_id(self) -> int:
         self._id_counter += 1
@@ -69,6 +70,7 @@ class RemoteConnection:
         except Exception as e:
             logger.error(f"Read loop error: {e}")
         # EOF or error — remote is gone, fail all pending requests
+        self._dead = True
         err = ConnectionError("Remote MCP server connection lost")
         for fut in self._pending.values():
             if not fut.done():
@@ -76,6 +78,8 @@ class RemoteConnection:
 
     async def send_request(self, method: str, params: dict) -> dict:
         """Send a JSON-RPC request and wait for the response."""
+        if self._dead:
+            raise ConnectionError("Remote MCP server connection lost")
         req_id = self.next_id()
         request = {"jsonrpc": "2.0", "id": req_id, "method": method, "params": params}
         data = json.dumps(request) + "\n"
