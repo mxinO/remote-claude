@@ -271,7 +271,9 @@ async def _run_ssh_command(cluster: ClusterConfig, command: str) -> tuple[int, s
 async def find_claude_path(cluster: ClusterConfig) -> Optional[str]:
     """Find claude binary on the remote host."""
     if cluster.claude_path:
-        rc, out, _ = await _run_ssh_command(cluster, f"test -x {cluster.claude_path} && echo ok")
+        rc, out, stderr = await _run_ssh_command(cluster, f"test -x {cluster.claude_path} && echo ok")
+        if rc == 255:
+            raise RuntimeError(f"SSH connection to {cluster.name} failed: {stderr.strip()}")
         if rc == 0 and "ok" in out:
             return cluster.claude_path
 
@@ -283,7 +285,9 @@ async def find_claude_path(cluster: ClusterConfig) -> Optional[str]:
     # Also try `which claude`
     check_cmd += ' || (which claude 2>/dev/null && echo "FOUND:$(which claude)")'
 
-    rc, out, _ = await _run_ssh_command(cluster, check_cmd)
+    rc, out, stderr = await _run_ssh_command(cluster, check_cmd)
+    if rc == 255:
+        raise RuntimeError(f"SSH connection to {cluster.name} failed: {stderr.strip()}")
     for line in out.strip().splitlines():
         if line.startswith("FOUND:"):
             return line.split("FOUND:", 1)[1].strip()
