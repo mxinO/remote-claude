@@ -12,10 +12,11 @@ that get local harness notifications when done.
 
 import json
 import os
+import shlex
 import subprocess
 import sys
 
-ACTIVE_STATE_FILE = "/tmp/remote-claude-active.json"
+ACTIVE_STATE_FILE = f"/tmp/remote-claude-{os.getuid()}/active.json"
 CONTROL_DIR = os.path.expanduser("~/.ssh/controlmasters")
 
 
@@ -55,7 +56,7 @@ def main():
 
     # Prepend cd work_dir if set
     if state.get("work_dir"):
-        command = f"cd {state['work_dir']} && {command}"
+        command = f"cd {shlex.quote(state['work_dir'])} && {command}"
 
     args.extend(["--", command])
 

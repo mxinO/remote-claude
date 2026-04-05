@@ -6,6 +6,8 @@ import atexit
 import asyncio
 import json
 import logging
+import os
+import shlex
 import signal
 from typing import Dict, Optional
 
@@ -14,7 +16,9 @@ from mcp.server.fastmcp import Context, FastMCP
 from .config import ClusterConfig, Config, load_config
 from .proxy import RemoteConnection, connect, _build_ssh_args
 
-ACTIVE_STATE_FILE = "/tmp/remote-claude-active.json"
+_STATE_DIR = f"/tmp/remote-claude-{os.getuid()}"
+os.makedirs(_STATE_DIR, mode=0o700, exist_ok=True)
+ACTIVE_STATE_FILE = os.path.join(_STATE_DIR, "active.json")
 
 logger = logging.getLogger(__name__)
 
@@ -246,36 +250,6 @@ async def remote_grep(
 
 
 
-_TASK_OUTPUT_PATTERN = "/tmp/claude-$(id -u)/*/tasks/{task_id}.output"
-
-
-async def _format_background_result(result: str, conn: RemoteConnection) -> str:
-    """Format a background task result with task ID and resolved output file path."""
-    try:
-        parsed = json.loads(result)
-        task_id = parsed.get("backgroundTaskId", "")
-        if task_id:
-            # Resolve the actual output file path
-            find_result = await conn.call_tool("Bash", {
-                "command": f"find /tmp/claude-$(id -u) -name '{task_id}.output' 2>/dev/null | head -1"
-            })
-            output_file = ""
-            try:
-                output_file = json.loads(find_result).get("stdout", "").strip()
-            except (json.JSONDecodeError, TypeError):
-                pass
-            if output_file:
-                return (
-                    f"Background task started on remote: {task_id}\n"
-                    f"Output file: {output_file}\n"
-                    f"Check with: remote_read(file_path=\"{output_file}\")"
-                )
-            return f"Background task started on remote: {task_id}"
-    except (json.JSONDecodeError, TypeError):
-        pass
-    return result
-
-
 def _cleanup():
     """Kill all remote SSH/claude processes on exit."""
     import subprocess
@@ -283,13 +257,12 @@ def _cleanup():
         logger.info(f"Closing connection to {name}")
         # Kill local SSH process
         if conn.process.returncode is None:
-            conn.process.terminate()
             try:
-                conn.process.wait()
-            except Exception:
                 conn.process.kill()
+            except Exception:
+                pass
         # Kill remote claude mcp serve via PID file
-        pidfile = f"/tmp/remote-claude-mcp-{conn.cluster.name}.pid"
+        pidfile = f"/tmp/remote-claude-mcp-{shlex.quote(conn.cluster.name)}.pid"
         host = f"{conn.cluster.user}@{conn.cluster.host}" if conn.cluster.user else conn.cluster.host
         try:
             subprocess.run(

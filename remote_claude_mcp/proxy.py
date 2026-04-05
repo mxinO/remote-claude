@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import os
+import shlex
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 
@@ -60,7 +61,9 @@ class RemoteConnection:
                     continue
                 msg_id = msg.get("id")
                 if msg_id is not None and msg_id in self._pending:
-                    self._pending[msg_id].set_result(msg)
+                    fut = self._pending[msg_id]
+                    if not fut.done():
+                        fut.set_result(msg)
         except asyncio.CancelledError:
             pass
         except Exception as e:
@@ -78,7 +81,7 @@ class RemoteConnection:
         request = {"jsonrpc": "2.0", "id": req_id, "method": method, "params": params}
         data = json.dumps(request) + "\n"
 
-        future = asyncio.get_event_loop().create_future()
+        future = asyncio.get_running_loop().create_future()
         self._pending[req_id] = future
 
         try:
@@ -119,7 +122,7 @@ class RemoteConnection:
                     "params": {"name": tool_name, "arguments": arguments}}
         data = json.dumps(request) + "\n"
 
-        future = asyncio.get_event_loop().create_future()
+        future = asyncio.get_running_loop().create_future()
         self._pending[req_id] = future
 
         try:
@@ -199,7 +202,7 @@ class RemoteConnection:
                 except asyncio.TimeoutError:
                     self.process.kill()
         # Also kill remote process via PID file as a safety net
-        pidfile = f"/tmp/remote-claude-mcp-{self.cluster.name}.pid"
+        pidfile = f"/tmp/remote-claude-mcp-{shlex.quote(self.cluster.name)}.pid"
         try:
             await _run_ssh_command(
                 self.cluster,
@@ -283,7 +286,7 @@ async def connect(cluster: ClusterConfig, work_dir: str = "") -> RemoteConnectio
     logger.info(f"Using claude at {claude_path} on {cluster.name}")
 
     # Step 2: Kill any orphan claude mcp serve processes from previous sessions
-    pidfile = f"/tmp/remote-claude-mcp-{cluster.name}.pid"
+    pidfile = f"/tmp/remote-claude-mcp-{shlex.quote(cluster.name)}.pid"
     await _run_ssh_command(
         cluster,
         f"test -f {pidfile} && kill $(cat {pidfile}) 2>/dev/null; rm -f {pidfile}"
@@ -292,14 +295,14 @@ async def connect(cluster: ClusterConfig, work_dir: str = "") -> RemoteConnectio
     # Step 3: Start `claude mcp serve` over SSH, optionally in a working directory
     # Write PID file, then exec so stdin/stdout go directly to claude.
     # Orphan cleanup relies on: PID file kill on reconnect + atexit SSH kill.
-    cd_cmd = f"cd {work_dir} && " if work_dir else ""
+    cd_cmd = f"cd {shlex.quote(work_dir)} && " if work_dir else ""
     serve_cmd = f'{cd_cmd}echo $$ > {pidfile} && exec {claude_path} mcp serve'
     ssh_args = _build_ssh_args(cluster) + ["--", serve_cmd]
     proc = await asyncio.create_subprocess_exec(
         *ssh_args,
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.DEVNULL,
     )
 
     conn = RemoteConnection(cluster=cluster, process=proc, claude_path=claude_path, work_dir=work_dir)
