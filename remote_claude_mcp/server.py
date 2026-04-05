@@ -168,7 +168,7 @@ async def remote_edit(
     file_path: str, old_string: str, new_string: str, replace_all: bool = False
 ) -> str:
     conn = _get_active()
-    return await conn.call_tool(
+    result = await conn.call_tool(
         "Edit",
         {
             "file_path": file_path,
@@ -177,6 +177,14 @@ async def remote_edit(
             "replace_all": replace_all,
         },
     )
+    # Strip originalFile from response to save tokens — it contains the
+    # entire file content which can be huge for large files.
+    try:
+        parsed = json.loads(result)
+        parsed.pop("originalFile", None)
+        return json.dumps(parsed)
+    except (json.JSONDecodeError, TypeError):
+        return result
 
 
 @server.tool(description="Same as Glob but runs on the active remote cluster.")
