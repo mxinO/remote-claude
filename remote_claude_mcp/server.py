@@ -163,9 +163,6 @@ async def remote_read(
         start_line = parsed.get("file", {}).get("startLine", 1)
         if content:
             lines = content.split("\n")
-            # Remove trailing empty line from split
-            if lines and lines[-1] == "":
-                lines = lines[:-1]
             numbered = "\n".join(
                 f"{start_line + i}\t{line}" for i, line in enumerate(lines)
             )
