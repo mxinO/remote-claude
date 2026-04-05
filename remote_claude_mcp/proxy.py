@@ -303,6 +303,16 @@ async def connect(cluster: ClusterConfig, work_dir: str = "") -> RemoteConnectio
 
     logger.info(f"Using claude at {claude_path} on {cluster.name}")
 
+    # Resolve work_dir: expand ~ or default to remote $HOME
+    if not work_dir or work_dir == "~":
+        rc, out, _ = await _run_ssh_command(cluster, "echo $HOME")
+        if rc == 0 and out.strip():
+            work_dir = out.strip()
+    elif work_dir.startswith("~/"):
+        rc, out, _ = await _run_ssh_command(cluster, "echo $HOME")
+        if rc == 0 and out.strip():
+            work_dir = out.strip() + work_dir[1:]
+
     # Step 2: Kill any orphan claude mcp serve processes from previous sessions
     pidfile = f"/tmp/remote-claude-mcp-{shlex.quote(cluster.name)}.pid"
     await _run_ssh_command(
@@ -315,7 +325,7 @@ async def connect(cluster: ClusterConfig, work_dir: str = "") -> RemoteConnectio
     # Orphan cleanup relies on: PID file kill on reconnect + atexit SSH kill.
     # Validate work_dir before starting the server
     if work_dir:
-        rc, _, stderr = await _run_ssh_command(cluster, f"test -d {shlex.quote(work_dir)}")
+        rc, _, _ = await _run_ssh_command(cluster, f"test -d {shlex.quote(work_dir)}")
         if rc != 0:
             raise RuntimeError(f"work_dir does not exist on {cluster.name}: {work_dir}")
 
