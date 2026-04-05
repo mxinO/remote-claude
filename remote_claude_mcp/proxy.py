@@ -297,7 +297,8 @@ async def connect(cluster: ClusterConfig, work_dir: str = "") -> RemoteConnectio
     # Write PID file, then exec so stdin/stdout go directly to claude.
     # Orphan cleanup relies on: PID file kill on reconnect + atexit SSH kill.
     cd_cmd = f"cd {shlex.quote(work_dir)} && " if work_dir else ""
-    serve_cmd = f'{cd_cmd}echo $$ > {pidfile} && exec {claude_path} mcp serve'
+    logfile = f"/tmp/remote-claude-mcp-{shlex.quote(cluster.name)}.log"
+    serve_cmd = f'{cd_cmd}echo $$ > {pidfile} && exec {claude_path} mcp serve 2>>{logfile}'
     ssh_args = _build_ssh_args(cluster) + ["--", serve_cmd]
     proc = await asyncio.create_subprocess_exec(
         *ssh_args,
