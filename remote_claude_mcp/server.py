@@ -159,14 +159,18 @@ async def remote_read(
     # not the JSON wrapper that claude mcp serve returns.
     try:
         parsed = json.loads(result)
-        content = parsed.get("file", {}).get("content", "")
-        start_line = parsed.get("file", {}).get("startLine", 1)
-        if content:
-            lines = content.split("\n")
-            numbered = "\n".join(
-                f"{start_line + i}\t{line}" for i, line in enumerate(lines)
-            )
-            return numbered
+        file_info = parsed.get("file", {})
+        content = file_info.get("content", None)
+        if content is None:
+            return result  # not a file response
+        if content == "":
+            return ""  # empty file — local returns a system warning
+        start_line = file_info.get("startLine", 1)
+        lines = content.split("\n")
+        numbered = "\n".join(
+            f"{start_line + i}\t{line}" for i, line in enumerate(lines)
+        )
+        return numbered
     except (json.JSONDecodeError, TypeError, KeyError):
         pass
     return result
