@@ -154,7 +154,25 @@ async def remote_read(
         args["offset"] = offset
     if limit != 2000:
         args["limit"] = limit
-    return await conn.call_tool("Read", args)
+    result = await conn.call_tool("Read", args)
+    # Match local Read format — plain text with line numbers (cat -n style),
+    # not the JSON wrapper that claude mcp serve returns.
+    try:
+        parsed = json.loads(result)
+        content = parsed.get("file", {}).get("content", "")
+        start_line = parsed.get("file", {}).get("startLine", 1)
+        if content:
+            lines = content.split("\n")
+            # Remove trailing empty line from split
+            if lines and lines[-1] == "":
+                lines = lines[:-1]
+            numbered = "\n".join(
+                f"{start_line + i}\t{line}" for i, line in enumerate(lines)
+            )
+            return numbered
+    except (json.JSONDecodeError, TypeError, KeyError):
+        pass
+    return result
 
 
 @server.tool(description="Same as Write but runs on the active remote cluster.")
