@@ -108,7 +108,7 @@ class RemoteConnection:
 
     async def call_tool(self, tool_name: str, arguments: dict) -> str:
         """Call a tool on the remote MCP server and return the text result."""
-        if self.process.returncode is not None:
+        if self._dead:
             return "[ERROR] Remote connection is dead. Call use_cluster() to reconnect."
         try:
             resp = await self.send_request(
@@ -143,6 +143,8 @@ class RemoteConnection:
                         asyncio.shield(future), timeout=progress_interval
                     )
                     return self._extract_result(result)
+                except ConnectionError:
+                    return "[ERROR] Remote connection lost. Call use_cluster() to reconnect."
                 except asyncio.TimeoutError:
                     elapsed += progress_interval
                     # Heartbeat: send a quick command to verify connection is alive
