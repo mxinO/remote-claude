@@ -313,6 +313,12 @@ async def connect(cluster: ClusterConfig, work_dir: str = "") -> RemoteConnectio
     # Step 3: Start `claude mcp serve` over SSH, optionally in a working directory
     # Write PID file, then exec so stdin/stdout go directly to claude.
     # Orphan cleanup relies on: PID file kill on reconnect + atexit SSH kill.
+    # Validate work_dir before starting the server
+    if work_dir:
+        rc, _, stderr = await _run_ssh_command(cluster, f"test -d {shlex.quote(work_dir)}")
+        if rc != 0:
+            raise RuntimeError(f"work_dir does not exist on {cluster.name}: {work_dir}")
+
     cd_cmd = f"cd {shlex.quote(work_dir)} && " if work_dir else ""
     logfile = f"/tmp/remote-claude-mcp-{shlex.quote(cluster.name)}.log"
     serve_cmd = f'{cd_cmd}echo $$ > {pidfile} && exec {claude_path} mcp serve 2>>{logfile}'
