@@ -327,12 +327,19 @@ async def connect(cluster: ClusterConfig, work_dir: str = "") -> RemoteConnectio
     conn = RemoteConnection(cluster=cluster, process=proc, claude_path=claude_path, work_dir=work_dir)
     await conn.start_read_loop()
 
-    # Step 3: MCP handshake
-    resp = await conn.send_request("initialize", {
-        "protocolVersion": "2024-11-05",
-        "capabilities": {},
-        "clientInfo": {"name": "remote-claude-mcp", "version": "1.0.0"},
-    })
+    # MCP handshake
+    try:
+        resp = await conn.send_request("initialize", {
+            "protocolVersion": "2024-11-05",
+            "capabilities": {},
+            "clientInfo": {"name": "remote-claude-mcp", "version": "1.0.0"},
+        })
+    except ConnectionError:
+        await conn.close()
+        raise RuntimeError(
+            f"SSH connection to {cluster.name} ({cluster.host}) died immediately. "
+            f"Check SSH auth (MFA expired?) — try: ssh {cluster.host}"
+        )
 
     if "error" in resp:
         await conn.close()
