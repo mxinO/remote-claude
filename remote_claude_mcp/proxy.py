@@ -65,15 +65,14 @@ class RemoteConnection:
                     if not fut.done():
                         fut.set_result(msg)
         except asyncio.CancelledError:
-            pass
+            return  # intentional cancel (e.g. close()), don't fail futures
         except Exception as e:
             logger.error(f"Read loop error: {e}")
-        finally:
-            # Remote process died or EOF — fail all pending requests
-            err = ConnectionError("Remote MCP server connection lost")
-            for fut in self._pending.values():
-                if not fut.done():
-                    fut.set_exception(err)
+        # EOF or error — remote is gone, fail all pending requests
+        err = ConnectionError("Remote MCP server connection lost")
+        for fut in self._pending.values():
+            if not fut.done():
+                fut.set_exception(err)
 
     async def send_request(self, method: str, params: dict) -> dict:
         """Send a JSON-RPC request and wait for the response."""
@@ -224,6 +223,8 @@ def _build_ssh_args(cluster: ClusterConfig) -> list[str]:
         "-o", "ControlMaster=auto",
         "-o", f"ControlPath={CONTROL_DIR}/%r@%h:%p",
         "-o", "ControlPersist=600",
+        "-o", "ServerAliveInterval=15",
+        "-o", "ServerAliveCountMax=3",
     ]
     if cluster.ssh_key:
         args.extend(["-i", cluster.ssh_key])
