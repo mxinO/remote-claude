@@ -261,16 +261,14 @@ def _cleanup():
                 conn.process.kill()
             except Exception:
                 pass
-        # Kill remote claude mcp serve via PID file
+        # Kill remote claude mcp serve via PID file (reuse full SSH config
+        # so jump proxy, ssh_key, ControlPath etc. are included)
         pidfile = f"/tmp/remote-claude-mcp-{shlex.quote(conn.cluster.name)}.pid"
-        host = f"{conn.cluster.user}@{conn.cluster.host}" if conn.cluster.user else conn.cluster.host
+        ssh_args = _build_ssh_args(conn.cluster) + [
+            "--", f"test -f {pidfile} && kill $(cat {pidfile}) 2>/dev/null; rm -f {pidfile}"
+        ]
         try:
-            subprocess.run(
-                ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5",
-                 host, "--",
-                 f"test -f {pidfile} && kill $(cat {pidfile}) 2>/dev/null; rm -f {pidfile}"],
-                timeout=10, capture_output=True
-            )
+            subprocess.run(ssh_args, timeout=10, capture_output=True)
         except Exception:
             pass
 

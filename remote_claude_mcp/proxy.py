@@ -187,6 +187,12 @@ class RemoteConnection:
     async def close(self):
         if self._read_task:
             self._read_task.cancel()
+        # Fail any pending futures so send_request doesn't hang
+        err = ConnectionError("Connection closed")
+        for fut in self._pending.values():
+            if not fut.done():
+                fut.set_exception(err)
+        self._pending.clear()
         if self.process.returncode is None:
             try:
                 self.process.stdin.close()
