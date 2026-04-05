@@ -164,7 +164,8 @@ async def remote_read(
         if content is None:
             return result  # not a file response
         if content == "":
-            return ""  # empty file — local returns a system warning
+            total = file_info.get("totalLines", 1)
+            return f"Warning: the file exists but has empty contents. The file has {total} lines."
         start_line = file_info.get("startLine", 1)
         lines = content.split("\n")
         numbered = "\n".join(
