@@ -221,7 +221,19 @@ async def remote_glob(pattern: str, path: str = "") -> str:
     args = {"pattern": pattern}
     if path:
         args["path"] = path
-    return await conn.call_tool("Glob", args)
+    result = await conn.call_tool("Glob", args)
+    if result.startswith("[ERROR]"):
+        return result
+    try:
+        parsed = json.loads(result)
+        filenames = parsed.get("filenames", [])
+        truncated = parsed.get("truncated", False)
+        out = "\n".join(filenames)
+        if truncated:
+            out += f"\n(truncated — {parsed.get('numFiles', len(filenames))} files shown)"
+        return out if out else "(no matches)"
+    except (json.JSONDecodeError, TypeError):
+        return result
 
 
 @server.tool(description="Same as Grep but runs on the active remote cluster.")
