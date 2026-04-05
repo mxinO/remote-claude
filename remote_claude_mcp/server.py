@@ -160,7 +160,10 @@ async def remote_read(
 @server.tool(description="Same as Write but runs on the active remote cluster.")
 async def remote_write(file_path: str, content: str) -> str:
     conn = _get_active()
-    return await conn.call_tool("Write", {"file_path": file_path, "content": content})
+    result = await conn.call_tool("Write", {"file_path": file_path, "content": content})
+    if result.startswith("[ERROR]"):
+        return result
+    return f"File created successfully at: {file_path}"
 
 
 @server.tool(description="Same as Edit but runs on the active remote cluster.")
@@ -177,12 +180,13 @@ async def remote_edit(
             "replace_all": replace_all,
         },
     )
-    # Strip originalFile from response to save tokens — it contains the
-    # entire file content which can be huge for large files.
+    # Match local Edit behavior — return minimal confirmation, not the
+    # full file content + patch that claude mcp serve returns.
+    if result.startswith("[ERROR]"):
+        return result
     try:
         parsed = json.loads(result)
-        parsed.pop("originalFile", None)
-        return json.dumps(parsed)
+        return f"The file {parsed.get('filePath', file_path)} has been updated successfully."
     except (json.JSONDecodeError, TypeError):
         return result
 
