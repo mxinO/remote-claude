@@ -304,14 +304,15 @@ async def connect(cluster: ClusterConfig, work_dir: str = "") -> RemoteConnectio
     logger.info(f"Using claude at {claude_path} on {cluster.name}")
 
     # Resolve work_dir: expand ~ or default to remote $HOME
-    if not work_dir or work_dir == "~":
+    if not work_dir or work_dir == "~" or work_dir.startswith("~/"):
         rc, out, _ = await _run_ssh_command(cluster, "echo $HOME")
-        if rc == 0 and out.strip():
-            work_dir = out.strip()
-    elif work_dir.startswith("~/"):
-        rc, out, _ = await _run_ssh_command(cluster, "echo $HOME")
-        if rc == 0 and out.strip():
-            work_dir = out.strip() + work_dir[1:]
+        home = out.strip() if rc == 0 else ""
+        if not home:
+            raise RuntimeError(f"Failed to detect remote $HOME on {cluster.name}")
+        if not work_dir or work_dir == "~":
+            work_dir = home
+        else:
+            work_dir = home + work_dir[1:]
 
     # Step 2: Kill any orphan claude mcp serve processes from previous sessions
     pidfile = f"/tmp/remote-claude-mcp-{shlex.quote(cluster.name)}.pid"
