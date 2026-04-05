@@ -97,6 +97,8 @@ class RemoteConnection:
 
     async def send_notification(self, method: str, params: dict = None):
         """Send a JSON-RPC notification (no response expected)."""
+        if self._dead:
+            return
         notif = {"jsonrpc": "2.0", "method": method}
         if params:
             notif["params"] = params
@@ -120,6 +122,8 @@ class RemoteConnection:
         self, tool_name: str, arguments: dict, ctx, progress_interval: int = 5
     ) -> str:
         """Call a tool, reporting progress with heartbeat while waiting."""
+        if self._dead:
+            return "[ERROR] Remote connection is dead. Call use_cluster() to reconnect."
         req_id = self.next_id()
         request = {"jsonrpc": "2.0", "id": req_id, "method": "tools/call",
                     "params": {"name": tool_name, "arguments": arguments}}
@@ -189,6 +193,7 @@ class RemoteConnection:
         return "\n".join(parts) if parts else "(no output)"
 
     async def close(self):
+        self._dead = True
         if self._read_task:
             self._read_task.cancel()
         # Fail any pending futures so send_request doesn't hang
