@@ -65,10 +65,12 @@ class RemoteConnection:
             pass
         except Exception as e:
             logger.error(f"Read loop error: {e}")
-            # Fail all pending requests
+        finally:
+            # Remote process died or EOF — fail all pending requests
+            err = ConnectionError("Remote MCP server connection lost")
             for fut in self._pending.values():
                 if not fut.done():
-                    fut.set_exception(e)
+                    fut.set_exception(err)
 
     async def send_request(self, method: str, params: dict) -> dict:
         """Send a JSON-RPC request and wait for the response."""
@@ -98,9 +100,14 @@ class RemoteConnection:
 
     async def call_tool(self, tool_name: str, arguments: dict) -> str:
         """Call a tool on the remote MCP server and return the text result."""
-        resp = await self.send_request(
-            "tools/call", {"name": tool_name, "arguments": arguments}
-        )
+        if self.process.returncode is not None:
+            return "[ERROR] Remote connection is dead. Call use_cluster() to reconnect."
+        try:
+            resp = await self.send_request(
+                "tools/call", {"name": tool_name, "arguments": arguments},
+            )
+        except ConnectionError:
+            return "[ERROR] Remote connection lost. Call use_cluster() to reconnect."
         return self._extract_result(resp)
 
     async def call_tool_with_progress(
