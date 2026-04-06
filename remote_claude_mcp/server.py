@@ -98,8 +98,8 @@ async def use_cluster(name: str, work_dir: str = "") -> str:
 
     _connections[name] = conn
     _active_cluster = name
-    _write_active_state(cluster, work_dir)
-    wd = f", work_dir={work_dir}" if work_dir else ""
+    _write_active_state(cluster, conn.work_dir)
+    wd = f", work_dir={conn.work_dir}" if conn.work_dir else ""
     return (
         f"Connected to '{name}' ({cluster.host}{wd}) — "
         f"claude at {conn.claude_path}. Ready for remote_* commands."
