@@ -111,7 +111,7 @@ cat > "$HOOK_SCRIPT" << 'HOOKSCRIPT'
 #!/bin/bash
 # Expose session_id as $CLAUDE_SESSION_ID for remote-claude-mcp
 if [ -n "$CLAUDE_ENV_FILE" ]; then
-  session_id=$(cat | python3 -c "import sys,json; print(json.load(sys.stdin).get('session_id',''))" 2>/dev/null)
+  session_id=$(cat | python3 -c "import sys,json,re; s=json.load(sys.stdin).get('session_id',''); print(re.sub(r'[^a-zA-Z0-9_-]','',s))" 2>/dev/null)
   if [ -n "$session_id" ]; then
     echo "export CLAUDE_SESSION_ID='$session_id'" >> "$CLAUDE_ENV_FILE"
   fi

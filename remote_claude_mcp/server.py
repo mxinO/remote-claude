@@ -7,6 +7,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import shlex
 import signal
 from typing import Dict, Optional
@@ -84,8 +85,7 @@ async def use_cluster(name: str, work_dir: str = "", session_id: str = "") -> st
     if not session_id:
         session_id = "default"
     # Sanitize: only allow alphanumeric, dash, underscore
-    import re
-    session_id = re.sub(r'[^a-zA-Z0-9_-]', '', session_id)
+    session_id = re.sub(r'[^a-zA-Z0-9_-]', '', session_id) or "default"
     _active_session = session_id
     key = _conn_key(session_id, name)
 
