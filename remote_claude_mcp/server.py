@@ -83,9 +83,11 @@ async def use_cluster(name: str, work_dir: str = "", session_id: str = "") -> st
     global _active_cluster, _active_session
 
     if not session_id:
-        session_id = "default"
+        return "[ERROR] session_id is required. Read it via Bash: echo $CLAUDE_SESSION_ID"
     # Sanitize: only allow alphanumeric, dash, underscore
-    session_id = re.sub(r'[^a-zA-Z0-9_-]', '', session_id) or "default"
+    session_id = re.sub(r'[^a-zA-Z0-9_-]', '', session_id)
+    if not session_id:
+        return "[ERROR] session_id is invalid after sanitization."
     _active_session = session_id
     key = _conn_key(session_id, name)
 

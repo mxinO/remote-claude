@@ -28,7 +28,10 @@ def main():
     command = " ".join(sys.argv[1:])
 
     # Read active cluster state (session-scoped)
-    session_id = os.environ.get("CLAUDE_SESSION_ID", "default")
+    session_id = os.environ.get("CLAUDE_SESSION_ID", "")
+    if not session_id:
+        print("$CLAUDE_SESSION_ID not set. Is the SessionStart hook installed?", file=sys.stderr)
+        sys.exit(1)
     state_file = os.path.join(_STATE_DIR, f"active-{session_id}.json")
     if not os.path.exists(state_file):
         print(f"No active cluster for session {session_id}. Use use_cluster() first.", file=sys.stderr)
