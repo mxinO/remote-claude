@@ -83,6 +83,9 @@ async def use_cluster(name: str, work_dir: str = "", session_id: str = "") -> st
 
     if not session_id:
         session_id = "default"
+    # Sanitize: only allow alphanumeric, dash, underscore
+    import re
+    session_id = re.sub(r'[^a-zA-Z0-9_-]', '', session_id)
     _active_session = session_id
     key = _conn_key(session_id, name)
 
@@ -306,6 +309,12 @@ def _cleanup():
         try:
             subprocess.run(ssh_args, timeout=10, capture_output=True)
         except Exception:
+            pass
+    # Clean up state files for this session
+    if _active_session:
+        try:
+            os.remove(_state_file(_active_session))
+        except OSError:
             pass
 
 
