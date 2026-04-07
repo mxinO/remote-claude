@@ -4,6 +4,8 @@
 When the user asks to work on a remote machine (e.g. "work on dev1", "let's use the prod cluster",
 "edit files on my-host.example.com"), use the remote-claude MCP tools:
 - First call use_cluster() with the cluster name or hostname to connect.
+  Always pass session_id=$CLAUDE_SESSION_ID (read it via Bash: `echo $CLAUDE_SESSION_ID`).
+  This ensures multiple sessions don't interfere with each other.
 - If the user specifies a working directory, pass it as work_dir to use_cluster().
   This starts the remote server in that directory so relative paths work naturally.
 - If the user changes the working directory later (e.g. "now work in /other/project"),

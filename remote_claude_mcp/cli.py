@@ -16,7 +16,7 @@ import shlex
 import subprocess
 import sys
 
-ACTIVE_STATE_FILE = f"/tmp/remote-claude-{os.getuid()}/active.json"
+_STATE_DIR = f"/tmp/remote-claude-{os.getuid()}"
 CONTROL_DIR = os.path.expanduser("~/.ssh/controlmasters")
 
 
@@ -27,12 +27,14 @@ def main():
 
     command = " ".join(sys.argv[1:])
 
-    # Read active cluster state
-    if not os.path.exists(ACTIVE_STATE_FILE):
-        print("No active cluster. Use use_cluster() first.", file=sys.stderr)
+    # Read active cluster state (session-scoped)
+    session_id = os.environ.get("CLAUDE_SESSION_ID", "default")
+    state_file = os.path.join(_STATE_DIR, f"active-{session_id}.json")
+    if not os.path.exists(state_file):
+        print(f"No active cluster for session {session_id}. Use use_cluster() first.", file=sys.stderr)
         sys.exit(1)
 
-    with open(ACTIVE_STATE_FILE) as f:
+    with open(state_file) as f:
         state = json.load(f)
 
     # Build SSH args

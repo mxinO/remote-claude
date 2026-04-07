@@ -18,7 +18,7 @@ from .proxy import RemoteConnection, connect, _build_ssh_args
 
 _STATE_DIR = f"/tmp/remote-claude-{os.getuid()}"
 os.makedirs(_STATE_DIR, mode=0o700, exist_ok=True)
-ACTIVE_STATE_FILE = os.path.join(_STATE_DIR, "active.json")
+ACTIVE_STATE_FILE = os.path.join(_STATE_DIR, "active-{session_id}.json")
 
 logger = logging.getLogger(__name__)
 
@@ -33,11 +33,20 @@ server = FastMCP(
 
 # State
 _config: Config = Config()
-_connections: Dict[str, RemoteConnection] = {}
-_active_cluster: Optional[str] = None
+_connections: Dict[str, RemoteConnection] = {}  # key: "session_id:cluster_name"
+_active_cluster: Optional[str] = None  # key: "session_id:cluster_name"
+_active_session: Optional[str] = None
 
 
-def _write_active_state(cluster: ClusterConfig, work_dir: str = ""):
+def _conn_key(session_id: str, cluster_name: str) -> str:
+    return f"{session_id}:{cluster_name}"
+
+
+def _state_file(session_id: str) -> str:
+    return ACTIVE_STATE_FILE.format(session_id=session_id)
+
+
+def _write_active_state(session_id: str, cluster: ClusterConfig, work_dir: str = ""):
     """Write active cluster state so the `remote` CLI can read it."""
     state = {
         "name": cluster.name,
@@ -48,7 +57,7 @@ def _write_active_state(cluster: ClusterConfig, work_dir: str = ""):
         "jump_proxy": cluster.jump_proxy,
         "port": cluster.port,
     }
-    with open(ACTIVE_STATE_FILE, "w") as f:
+    with open(_state_file(session_id), "w") as f:
         json.dump(state, f)
 
 
@@ -57,7 +66,7 @@ def _get_active() -> RemoteConnection:
         raise RuntimeError("No active cluster. Call use_cluster(name) first.")
     conn = _connections.get(_active_cluster)
     if conn is None:
-        raise RuntimeError(f"Cluster '{_active_cluster}' not connected.")
+        raise RuntimeError(f"Connection '{_active_cluster}' not found.")
     return conn
 
 
@@ -65,24 +74,30 @@ def _get_active() -> RemoteConnection:
     description=(
         "Connect to a remote cluster and set it as active. "
         "Use a name from clusters.yaml config, or pass a raw hostname. "
-        "Optionally set a working directory — all relative paths will resolve from there."
+        "Optionally set a working directory — all relative paths will resolve from there. "
+        "Pass session_id=$CLAUDE_SESSION_ID for per-session isolation."
     )
 )
-async def use_cluster(name: str, work_dir: str = "") -> str:
-    global _active_cluster
+async def use_cluster(name: str, work_dir: str = "", session_id: str = "") -> str:
+    global _active_cluster, _active_session
+
+    if not session_id:
+        session_id = "default"
+    _active_session = session_id
+    key = _conn_key(session_id, name)
 
     # Already connected — check if still alive, switch or reconnect
-    if name in _connections:
-        conn = _connections[name]
+    if key in _connections:
+        conn = _connections[key]
         alive = conn.process.returncode is None and await conn._heartbeat()
         if alive and (not work_dir or work_dir == conn.work_dir):
-            _active_cluster = name
-            _write_active_state(conn.cluster, conn.work_dir)
+            _active_cluster = key
+            _write_active_state(session_id, conn.cluster, conn.work_dir)
             return f"Switched to cluster '{name}' ({conn.cluster.host})"
         # Dead or work_dir changed — reconnect
         logger.info(f"Reconnecting to '{name}' (alive={alive})")
         await conn.close()
-        del _connections[name]
+        del _connections[key]
 
     # Resolve config
     if name in _config.clusters:
@@ -92,13 +107,13 @@ async def use_cluster(name: str, work_dir: str = "") -> str:
         cluster = ClusterConfig(name=name, host=name)
 
     try:
-        conn = await connect(cluster, work_dir=work_dir)
+        conn = await connect(cluster, work_dir=work_dir, session_id=session_id)
     except Exception as e:
         return f"[ERROR] Failed to connect to '{name}': {e}"
 
-    _connections[name] = conn
-    _active_cluster = name
-    _write_active_state(cluster, conn.work_dir)
+    _connections[key] = conn
+    _active_cluster = key
+    _write_active_state(session_id, cluster, conn.work_dir)
     wd = f", work_dir={conn.work_dir}" if conn.work_dir else ""
     return (
         f"Connected to '{name}' ({cluster.host}{wd}) — "
@@ -108,17 +123,25 @@ async def use_cluster(name: str, work_dir: str = "") -> str:
 
 @server.tool(description="List available clusters from config and their connection status.")
 async def list_clusters() -> str:
+    # Collect connected cluster names for the active session
+    session = _active_session or "default"
+    connected = {}
+    for key, conn in _connections.items():
+        if key.startswith(f"{session}:"):
+            cluster_name = key.split(":", 1)[1]
+            connected[cluster_name] = conn
+
     lines = []
     for name, cluster in _config.clusters.items():
-        status = "connected" if name in _connections else "not connected"
-        active = " (active)" if name == _active_cluster else ""
+        status = "connected" if name in connected else "not connected"
+        active = " (active)" if _conn_key(session, name) == _active_cluster else ""
         lines.append(f"  {name}: {cluster.host} [{status}]{active}")
 
     # Also show ad-hoc connections not in config
-    for name in _connections:
+    for name, conn in connected.items():
         if name not in _config.clusters:
-            active = " (active)" if name == _active_cluster else ""
-            lines.append(f"  {name}: {_connections[name].cluster.host} [connected, ad-hoc]{active}")
+            active = " (active)" if _conn_key(session, name) == _active_cluster else ""
+            lines.append(f"  {name}: {conn.cluster.host} [connected, ad-hoc]{active}")
 
     if not lines:
         return "No clusters configured. Add clusters to ~/.config/remote-claude-mcp/clusters.yaml"
@@ -275,7 +298,8 @@ def _cleanup():
                 pass
         # Kill remote claude mcp serve via PID file (reuse full SSH config
         # so jump proxy, ssh_key, ControlPath etc. are included)
-        pidfile = f"/tmp/remote-claude-mcp-{shlex.quote(conn.cluster.name)}.pid"
+        sid = shlex.quote(conn.session_id) if conn.session_id else "default"
+        pidfile = f"/tmp/remote-claude-mcp-{shlex.quote(conn.cluster.name)}-{sid}.pid"
         ssh_args = _build_ssh_args(conn.cluster) + [
             "--", f"test -f {pidfile} && kill $(cat {pidfile}) 2>/dev/null; rm -f {pidfile}"
         ]
