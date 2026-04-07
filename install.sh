@@ -101,6 +101,79 @@ else
     echo "Config already exists at $CONFIG_DIR/clusters.yaml"
 fi
 
+# Install SessionStart hook for $CLAUDE_SESSION_ID
+HOOKS_DIR="$HOME/.claude/hooks"
+HOOK_SCRIPT="$HOOKS_DIR/remote-claude-session-id.sh"
+SETTINGS="$HOME/.claude/settings.json"
+
+mkdir -p "$HOOKS_DIR"
+cat > "$HOOK_SCRIPT" << 'HOOKSCRIPT'
+#!/bin/bash
+# Expose session_id as $CLAUDE_SESSION_ID for remote-claude-mcp
+if [ -n "$CLAUDE_ENV_FILE" ]; then
+  session_id=$(cat | python3 -c "import sys,json; print(json.load(sys.stdin).get('session_id',''))" 2>/dev/null)
+  if [ -n "$session_id" ]; then
+    echo "export CLAUDE_SESSION_ID='$session_id'" >> "$CLAUDE_ENV_FILE"
+  fi
+fi
+HOOKSCRIPT
+chmod +x "$HOOK_SCRIPT"
+
+# Add hook to settings.json if not already present
+if [ -f "$SETTINGS" ]; then
+    python3 - "$SETTINGS" "$HOOK_SCRIPT" << 'PYSCRIPT'
+import sys, json
+
+settings_path, hook_cmd = sys.argv[1], sys.argv[2]
+
+with open(settings_path) as f:
+    settings = json.load(f)
+
+hooks = settings.setdefault("hooks", {})
+session_start = hooks.setdefault("SessionStart", [])
+
+# Check if our hook is already registered
+for entry in session_start:
+    for h in entry.get("hooks", []):
+        if h.get("command", "").endswith("remote-claude-session-id.sh"):
+            print("SessionStart hook already registered.")
+            sys.exit(0)
+
+# Add our hook
+session_start.append({
+    "hooks": [{
+        "type": "command",
+        "command": hook_cmd
+    }]
+})
+
+with open(settings_path, "w") as f:
+    json.dump(settings, f, indent=2)
+    f.write("\n")
+
+print("Added SessionStart hook for $CLAUDE_SESSION_ID.")
+PYSCRIPT
+else
+    # Create settings.json with just the hook
+    cat > "$SETTINGS" << SETTINGSEOF
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOOK_SCRIPT"
+          }
+        ]
+      }
+    ]
+  }
+}
+SETTINGSEOF
+    echo "Created $SETTINGS with SessionStart hook."
+fi
+
 # Update CLAUDE.md instructions (replace if exists, append if not)
 CLAUDE_MD="$HOME/.claude/CLAUDE.md"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
