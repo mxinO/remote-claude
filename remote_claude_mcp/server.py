@@ -129,7 +129,7 @@ async def use_cluster(name: str, work_dir: str = "", session_id: str = "") -> st
 @server.tool(description="List available clusters from config and their connection status.")
 async def list_clusters() -> str:
     # Collect connected cluster names for the active session
-    session = _active_session or "default"
+    session = _active_session or ""
     connected = {}
     for key, conn in _connections.items():
         if key.startswith(f"{session}:"):
@@ -303,7 +303,9 @@ def _cleanup():
                 pass
         # Kill remote claude mcp serve via PID file (reuse full SSH config
         # so jump proxy, ssh_key, ControlPath etc. are included)
-        sid = shlex.quote(conn.session_id) if conn.session_id else "default"
+        if not conn.session_id:
+            continue
+        sid = shlex.quote(conn.session_id)
         pidfile = f"/tmp/remote-claude-mcp-{shlex.quote(conn.cluster.name)}-{sid}.pid"
         ssh_args = _build_ssh_args(conn.cluster) + [
             "--", f"test -f {pidfile} && kill $(cat {pidfile}) 2>/dev/null; rm -f {pidfile}"

@@ -219,7 +219,9 @@ class RemoteConnection:
                 except asyncio.TimeoutError:
                     self.process.kill()
         # Also kill remote process via PID file as a safety net
-        sid = shlex.quote(self.session_id) if self.session_id else "default"
+        if not self.session_id:
+            return
+        sid = shlex.quote(self.session_id)
         pidfile = f"/tmp/remote-claude-mcp-{shlex.quote(self.cluster.name)}-{sid}.pid"
         try:
             await _run_ssh_command(
@@ -321,7 +323,7 @@ async def connect(cluster: ClusterConfig, work_dir: str = "", session_id: str = 
             work_dir = home + work_dir[1:]
 
     # PID file is per-session to avoid killing other sessions' servers
-    sid = shlex.quote(session_id) if session_id else "default"
+    sid = shlex.quote(session_id)
     pidfile = f"/tmp/remote-claude-mcp-{shlex.quote(cluster.name)}-{sid}.pid"
 
     # Kill our own previous server for this session+cluster
