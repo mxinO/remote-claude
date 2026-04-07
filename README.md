@@ -8,7 +8,7 @@ Work on any remote cluster from a single local Claude Code session. Just say "wo
 Local Claude Code
     │
     ├── MCP gateway (file tools: Read, Edit, Write, Glob, Grep)
-    │       │ SSH (persistent session)
+    │       │ SSH (persistent session, keepalive)
     │       └── Remote: claude mcp serve
     │
     └── remote-claude CLI (bash commands)
@@ -18,7 +18,7 @@ Local Claude Code
 
 **File operations** (Read, Edit, Write, Glob, Grep) go through the MCP gateway which proxies to `claude mcp serve` on the remote — giving you Claude Code's exact tool implementations.
 
-**Bash commands** use the `remote-claude` CLI via the local Bash tool. This is faster (~160ms vs ~8s), supports `run_in_background` with local notifications, and reuses the gateway's SSH connection via ControlMaster.
+**Bash commands** use the `remote-claude` CLI via the local Bash tool. This supports `run_in_background` with local notifications, and reuses the gateway's SSH connection via ControlMaster.
 
 ## Install
 
@@ -31,7 +31,8 @@ This will:
 1. Install the Python package (`remote-claude-mcp` + `remote-claude` CLI)
 2. Register the MCP server with Claude Code
 3. Generate `~/.config/remote-claude-mcp/clusters.yaml` from your `~/.ssh/config` (skips git forges)
-4. Add usage instructions to `~/.claude/CLAUDE.md` (updates safely on reinstall)
+4. Install a `SessionStart` hook for per-session isolation (`$CLAUDE_SESSION_ID`)
+5. Add usage instructions to `~/.claude/CLAUDE.md` (updates safely on reinstall)
 
 Restart Claude Code to load the MCP server.
 
@@ -53,6 +54,8 @@ clusters:
     host: prod-cluster-01.example.com
     user: myuser
 ```
+
+SSH config (`ProxyJump`, `ControlMaster`, etc.) is respected automatically — no need to duplicate it here.
 
 Or set `REMOTE_CLAUDE_MCP_CONFIG=/path/to/clusters.yaml`.
 
@@ -101,14 +104,18 @@ The gateway auto-detects the claude binary in common paths (`~/.local/bin/claude
 
 - **Natural language** — just say "work on dev1" and Claude handles the rest
 - **Full fidelity** — proxies to `claude mcp serve`, so you get Claude Code's exact Edit, Read, Write tools
-- **Fast bash** — `remote-claude` CLI runs commands in ~160ms via SSH ControlMaster
+- **Per-session isolation** — multiple Claude Code sessions work independently on same/different clusters
 - **Background tasks** — `run_in_background` works with local harness notifications via `remote-claude` CLI
-- **Working directory** — set a work_dir and use relative paths, just like working locally
+- **Working directory** — set a work_dir and use relative paths, just like working locally; auto-detects remote `$HOME`
+- **Dead server detection** — immediate error if remote server dies, no hanging; auto-reconnect on next `use_cluster`
+- **SSH keepalive** — `ServerAliveInterval` prevents silent connection drops
 - **Auto-detect Claude Code** on remote hosts (searches common paths)
 - **Ad-hoc hosts** — use any hostname, not just configured clusters
-- **Minimal token overhead** — thin tool descriptions, no context bloat
+- **Minimal token overhead** — thin tool descriptions, responses match local tool format
 - **SSH config import** — install script reads `~/.ssh/config` to bootstrap cluster config
-- **Orphan cleanup** — PID files + signal handlers prevent zombie remote processes
+- **Orphan cleanup** — session-scoped PID files + signal handlers prevent zombie remote processes
+- **Multi-cluster** — switch between clusters within a session; all cleaned up on exit
+- **MFA support** — works with ControlMaster sessions for hosts requiring MFA
 
 ## Limitations
 
