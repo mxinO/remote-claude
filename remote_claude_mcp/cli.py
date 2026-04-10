@@ -230,11 +230,13 @@ print(json.dumps({"ok": True, "file": file_path, "replacements": count if replac
 def _edit_shell(state, file_path, args):
     """Edit via pure shell (awk). No Python required on remote."""
     # awk script: reads entire file, counts exact (non-regex) matches, replaces
-    # Uses index() for exact string matching — no regex interpretation
+    # Uses ENVIRON[] to read old/new strings — avoids awk -v backslash interpretation
+    # Preserves trailing newline by checking with a shell test before awk
     awk_script = r'''
 BEGIN {
-    old = OLD; new = NEW; ra = RA
-    count = 0; replaced = 0
+    old = ENVIRON["_OLD"]; new = ENVIRON["_NEW"]
+    ra = ENVIRON["_RA"]; outfile = ENVIRON["_OUTFILE"]
+    count = 0
     content = ""
 }
 {
@@ -272,21 +274,29 @@ END {
     }
     result = result tmp
 
-    printf "%s", result > OUTFILE
-    close(OUTFILE)
-    printf "{\"ok\":true,\"file\":\"%s\",\"replacements\":%d}\n", OUTFILE, done
+    # Preserve trailing newline: check if original file ended with one
+    if (ENVIRON["_HAS_TRAILING_NL"] == "1") {
+        printf "%s\n", result > outfile
+    } else {
+        printf "%s", result > outfile
+    }
+    close(outfile)
+    printf "{\"ok\":true,\"replacements\":%d}\n", done
 }
 '''
     replace_all_str = "true" if args.replace_all else "false"
 
-    # Pass old/new strings via environment variables to avoid shell escaping issues
-    # awk reads them from -v assignments
+    # Pass strings via environment variables — ENVIRON[] doesn't interpret backslashes
+    # Check trailing newline before awk runs
     cmd = (
-        f"awk -v OLD={shlex.quote(args.old_string)} "
-        f"-v NEW={shlex.quote(args.new_string)} "
-        f"-v RA={shlex.quote(replace_all_str)} "
-        f"-v OUTFILE={shlex.quote(file_path)} "
-        f"{shlex.quote(awk_script)} {shlex.quote(file_path)}"
+        f"export _OLD={shlex.quote(args.old_string)} "
+        f"_NEW={shlex.quote(args.new_string)} "
+        f"_RA={shlex.quote(replace_all_str)} "
+        f"_OUTFILE={shlex.quote(file_path)} && "
+        f"_HAS_TRAILING_NL=0 && "
+        f"[ -n \"$(tail -c 1 {shlex.quote(file_path)})\" ] || _HAS_TRAILING_NL=1 && "
+        f"export _HAS_TRAILING_NL && "
+        f"awk {shlex.quote(awk_script)} {shlex.quote(file_path)}"
     )
     return _run_ssh(state, cmd)
 
