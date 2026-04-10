@@ -170,32 +170,10 @@ fi
     print("\n".join(lines), end="")
 
 
-# ── edit ──────────────────────────────────────────────────────────────
+# ── edit backends ─────────────────────────────────────────────────────
 
-def cmd_edit(argv):
-    """Edit a file on the remote cluster with exact string replacement."""
-    import argparse
-    parser = argparse.ArgumentParser(prog="remote-claude edit")
-    parser.add_argument("file_path")
-    parser.add_argument("old_string")
-    parser.add_argument("new_string")
-    parser.add_argument("--replace-all", action="store_true")
-    args = parser.parse_args(argv)
-
-    if args.old_string == args.new_string:
-        print("old_string and new_string must be different.", file=sys.stderr)
-        sys.exit(1)
-
-    state, session_id = _get_state()
-    file_path = _resolve_path(state, args.file_path)
-
-    # Check if file was read first
-    if not _was_read(session_id, state["name"], file_path):
-        print(f"File has not been read yet. Read it first before editing.", file=sys.stderr)
-        sys.exit(1)
-
-    # Send the edit operation to remote as a Python script
-    # This ensures exact string matching (not regex) and proper error handling
+def _edit_python(state, file_path, args):
+    """Edit via remote Python. Returns (rc, stdout, stderr). rc=-1 if python3 not found."""
     edit_script = '''
 import sys, json
 
@@ -234,7 +212,6 @@ with open(file_path, "w") as f:
 
 print(json.dumps({"ok": True, "file": file_path, "replacements": count if replace_all else 1}))
 '''
-
     input_data = json.dumps({
         "old": args.old_string,
         "new": args.new_string,
@@ -243,6 +220,106 @@ print(json.dumps({"ok": True, "file": file_path, "replacements": count if replac
 
     cmd = f"python3 -c {shlex.quote(edit_script)} {shlex.quote(file_path)}"
     rc, out, err = _run_ssh(state, cmd, input_data=input_data)
+
+    # Detect python3 not found
+    if rc != 0 and ("python3: not found" in err or "No such file" in err):
+        return -1, "", ""
+    return rc, out, err
+
+
+def _edit_shell(state, file_path, args):
+    """Edit via pure shell (awk). No Python required on remote."""
+    # awk script: reads entire file, counts exact (non-regex) matches, replaces
+    # Uses index() for exact string matching — no regex interpretation
+    awk_script = r'''
+BEGIN {
+    old = OLD; new = NEW; ra = RA
+    count = 0; replaced = 0
+    content = ""
+}
+{
+    if (NR > 1) content = content "\n"
+    content = content $0
+}
+END {
+    # Count occurrences using index()
+    tmp = content
+    while ((pos = index(tmp, old)) > 0) {
+        count++
+        tmp = substr(tmp, pos + length(old))
+    }
+
+    if (count == 0) {
+        print "{\"error\":\"old_string not found in file.\"}"
+        exit 0
+    }
+
+    if (count > 1 && ra != "true") {
+        printf "{\"error\":\"Found %d matches of the string to replace, but replace_all is false. To replace all occurrences, use --replace-all. To replace only one, provide more context to uniquely identify the instance.\"}\n", count
+        exit 0
+    }
+
+    # Replace using index() — exact string, not regex
+    result = ""
+    tmp = content
+    limit = (ra == "true") ? 0 : 1
+    done = 0
+    while ((pos = index(tmp, old)) > 0) {
+        if (limit > 0 && done >= limit) break
+        result = result substr(tmp, 1, pos - 1) new
+        tmp = substr(tmp, pos + length(old))
+        done++
+    }
+    result = result tmp
+
+    printf "%s", result > OUTFILE
+    close(OUTFILE)
+    printf "{\"ok\":true,\"file\":\"%s\",\"replacements\":%d}\n", OUTFILE, done
+}
+'''
+    replace_all_str = "true" if args.replace_all else "false"
+
+    # Pass old/new strings via environment variables to avoid shell escaping issues
+    # awk reads them from -v assignments
+    cmd = (
+        f"awk -v OLD={shlex.quote(args.old_string)} "
+        f"-v NEW={shlex.quote(args.new_string)} "
+        f"-v RA={shlex.quote(replace_all_str)} "
+        f"-v OUTFILE={shlex.quote(file_path)} "
+        f"{shlex.quote(awk_script)} {shlex.quote(file_path)}"
+    )
+    return _run_ssh(state, cmd)
+
+
+# ── edit ──────────────────────────────────────────────────────────────
+
+def cmd_edit(argv):
+    """Edit a file on the remote cluster with exact string replacement."""
+    import argparse
+    parser = argparse.ArgumentParser(prog="remote-claude edit")
+    parser.add_argument("file_path")
+    parser.add_argument("old_string")
+    parser.add_argument("new_string")
+    parser.add_argument("--replace-all", action="store_true")
+    args = parser.parse_args(argv)
+
+    if args.old_string == args.new_string:
+        print("old_string and new_string must be different.", file=sys.stderr)
+        sys.exit(1)
+
+    state, session_id = _get_state()
+    file_path = _resolve_path(state, args.file_path)
+
+    # Check if file was read first
+    if not _was_read(session_id, state["name"], file_path):
+        print(f"File has not been read yet. Read it first before editing.", file=sys.stderr)
+        sys.exit(1)
+
+    # Try Python first, fall back to awk (pure shell)
+    rc, out, err = _edit_python(state, file_path, args)
+    if rc == -1:
+        # Python not available, use shell version
+        rc, out, err = _edit_shell(state, file_path, args)
 
     if rc != 0:
         print(f"Error: {err.strip()}", file=sys.stderr)
