@@ -127,6 +127,8 @@ if [ ! -e {shlex.quote(file_path)} ]; then
     echo "ERROR:NOENT"
 elif [ -d {shlex.quote(file_path)} ]; then
     echo "ERROR:ISDIR"
+elif [ ! -r {shlex.quote(file_path)} ]; then
+    echo "ERROR:PERM"
 elif [ ! -s {shlex.quote(file_path)} ]; then
     lines=$(wc -l < {shlex.quote(file_path)} 2>/dev/null || echo 1)
     echo "ERROR:EMPTY:$lines"
@@ -142,6 +144,9 @@ fi
         sys.exit(1)
     elif out == "ERROR:ISDIR":
         print(f"Path is a directory, not a file: {args.file_path}", file=sys.stderr)
+        sys.exit(1)
+    elif out == "ERROR:PERM":
+        print(f"Permission denied: {args.file_path}", file=sys.stderr)
         sys.exit(1)
     elif out.startswith("ERROR:EMPTY:"):
         total = out.split(":")[-1]
