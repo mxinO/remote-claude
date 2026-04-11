@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
-"""Read a file in cat -n format (line_number<tab>content)."""
-import json
+"""Read a file in cat -n format (line_number<tab>content).
+
+Matches Claude Code's local Read tool behavior:
+- offset: line number to start reading from (0 = beginning, 1-based otherwise)
+- limit: max number of lines to read (default 2000)
+- Output: "N\tcontent" per line, including trailing empty line after final newline
+"""
 import os
 import sys
 
@@ -11,14 +16,14 @@ def main():
         sys.exit(1)
 
     file_path = sys.argv[1]
-    offset = 0
+    offset = None  # None = not specified, default to 1-based
     limit = 2000
 
     args = sys.argv[2:]
     i = 0
     while i < len(args):
         if args[i] == "--offset" and i + 1 < len(args):
-            offset = int(args[i + 1])
+            offset = int(args[i + 1])  # explicitly provided
             i += 2
         elif args[i] == "--limit" and i + 1 < len(args):
             limit = int(args[i + 1])
@@ -50,22 +55,33 @@ def main():
 
     try:
         with open(file_path) as f:
-            for _ in range(offset):
-                if f.readline() == "":
-                    break
-            for i in range(limit):
-                line = f.readline()
-                if line == "":
-                    break
-                # cat -n format: number<tab>content (no trailing newline on last line if file lacks it)
-                line_no = offset + i + 1
-                if line.endswith("\n"):
-                    print(f"{line_no}\t{line[:-1]}")
-                else:
-                    print(f"{line_no}\t{line}", end="")
+            content = f.read()
     except Exception as e:
         print(f"Error reading file: {e}", file=sys.stderr)
         sys.exit(1)
+
+    # Split into lines preserving the trailing empty element after final \n
+    # "a\nb\n".split("\n") → ["a", "b", ""] — the empty string represents the line after \n
+    lines = content.split("\n")
+
+    # offset semantics (matches local Read tool):
+    # Not specified (None): start from beginning, number lines from 1
+    # offset=0: start from beginning, number lines from 0
+    # offset=N: start from line N (1-based), number from N
+    if offset is None:
+        start = 0
+        start_num = 1
+    elif offset == 0:
+        start = 0
+        start_num = 0
+    else:
+        start = offset - 1  # convert 1-based to 0-based index
+        start_num = offset
+    end = start + limit
+
+    for i, idx in enumerate(range(start, min(end, len(lines)))):
+        line_no = start_num + i
+        print(f"{line_no}\t{lines[idx]}")
 
 
 if __name__ == "__main__":

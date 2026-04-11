@@ -136,7 +136,7 @@ def cmd_read(argv):
     import argparse
     parser = argparse.ArgumentParser(prog="remote-claude read")
     parser.add_argument("file_path")
-    parser.add_argument("--offset", type=int, default=0)
+    parser.add_argument("--offset", type=int, default=None)
     parser.add_argument("--limit", type=int, default=2000)
     args = parser.parse_args(argv)
 
@@ -146,7 +146,7 @@ def cmd_read(argv):
 
     # Build remote read command
     tool_args = shlex.quote(file_path)
-    if args.offset:
+    if args.offset is not None:
         tool_args += f" --offset {args.offset}"
     if args.limit != 2000:
         tool_args += f" --limit {args.limit}"
