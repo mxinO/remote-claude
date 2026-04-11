@@ -77,6 +77,12 @@ def main():
     else:
         start = offset - 1  # convert 1-based to 0-based index
         start_num = offset
+
+    # Check if offset is past end of file
+    if start >= len(lines):
+        print(f"Warning: the file exists but is shorter than the provided offset ({offset}). The file has {len(lines)} lines.")
+        return
+
     end = start + limit
 
     for i, idx in enumerate(range(start, min(end, len(lines)))):
