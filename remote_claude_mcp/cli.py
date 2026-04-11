@@ -109,7 +109,7 @@ def _ensure_tools(state):
     if "OK" in out:
         return
 
-    # Deploy tools
+    # Deploy tools atomically (write to temp, mv to final path)
     local_dir = os.path.normpath(LOCAL_TOOLS_DIR)
     for tool in ("read", "edit"):
         local_path = os.path.join(local_dir, tool)
@@ -118,7 +118,9 @@ def _ensure_tools(state):
             sys.exit(1)
         with open(local_path, "rb") as f:
             content = f.read()
-        _run_ssh(state, f"mkdir -p {REMOTE_TOOLS_DIR} && cat > {REMOTE_TOOLS_DIR}/{tool} && chmod +x {REMOTE_TOOLS_DIR}/{tool}",
+        tmp = f"{REMOTE_TOOLS_DIR}/.{tool}.tmp.$$"
+        _run_ssh(state,
+                 f"mkdir -p {REMOTE_TOOLS_DIR} && cat > {tmp} && chmod +x {tmp} && mv {tmp} {REMOTE_TOOLS_DIR}/{tool}",
                  input_data=content)
 
 
